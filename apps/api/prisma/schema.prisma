@@ -1,0 +1,253 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String         @id @default(uuid())
+  email             String         @unique
+  passwordHash      String         @map("password_hash")
+  fullName          String         @map("full_name")
+  role              Role
+  isActive          Boolean        @default(true) @map("is_active")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+  deletedAt         DateTime?      @map("deleted_at")
+  auditLogs         AuditLog[]     @relation("ActorAudits")
+  hrOnboardings     Onboarding[]   @relation("HrOwner")
+  refreshTokens     RefreshToken[]
+  salesRequirements Requirement[]  @relation("SalesOwner")
+  taRequirements    Requirement[]  @relation("TaOwner")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Client {
+  id             String        @id @default(uuid())
+  name           String
+  nameNormalized String        @unique @map("name_normalized")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+  deletedAt      DateTime?     @map("deleted_at")
+  requirements   Requirement[]
+
+  @@map("clients")
+}
+
+model JobFamily {
+  id           String        @id @default(uuid())
+  name         String        @unique
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  requirements Requirement[]
+
+  @@map("job_families")
+}
+
+model LookupType {
+  id        String        @id @default(uuid())
+  code      String        @unique
+  label     String
+  createdAt DateTime      @default(now()) @map("created_at")
+  values    LookupValue[]
+
+  @@map("lookup_types")
+}
+
+model LookupValue {
+  id           String     @id @default(uuid())
+  lookupTypeId String     @map("lookup_type_id")
+  code         String
+  label        String
+  sortOrder    Int        @default(0) @map("sort_order")
+  isActive     Boolean    @default(true) @map("is_active")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  lookupType   LookupType @relation(fields: [lookupTypeId], references: [id])
+
+  @@unique([lookupTypeId, code])
+  @@map("lookup_values")
+}
+
+model Requirement {
+  id                String            @id @default(uuid())
+  publicId          String            @unique @map("public_id")
+  requirementDate   DateTime          @map("requirement_date") @db.Date
+  clientId          String            @map("client_id")
+  roleSkill         String            @map("role_skill")
+  jobFamilyId       String            @map("job_family_id")
+  numberOfPositions Int               @map("number_of_positions")
+  salesOwnerId      String            @map("sales_owner_id")
+  taOwnerId         String?           @map("ta_owner_id")
+  priorityCode      String            @map("priority_code")
+  taHandoffDate     DateTime?         @map("ta_handoff_date") @db.Date
+  targetClosureDate DateTime?         @map("target_closure_date") @db.Date
+  remarks           String?
+  experience        String?
+  jobLocation       String?           @map("job_location")
+  minBudget         Decimal?          @map("min_budget") @db.Decimal(14, 2)
+  maxBudget         Decimal?          @map("max_budget") @db.Decimal(14, 2)
+  durationMonths    Int?              @map("duration_months")
+  status            RequirementStatus @default(ACTIVE)
+  legacyReqId       Int?              @map("legacy_req_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  deletedAt         DateTime?         @map("deleted_at")
+  candidates        Candidate[]
+  offers            Offer[]
+  onboardings       Onboarding[]
+  client            Client            @relation(fields: [clientId], references: [id])
+  jobFamily         JobFamily         @relation(fields: [jobFamilyId], references: [id])
+  salesOwner        User              @relation("SalesOwner", fields: [salesOwnerId], references: [id])
+  taOwner           User?             @relation("TaOwner", fields: [taOwnerId], references: [id])
+
+  @@index([status])
+  @@index([taOwnerId])
+  @@index([salesOwnerId])
+  @@index([clientId])
+  @@index([requirementDate])
+  @@map("requirements")
+}
+
+model Candidate {
+  id          String      @id @default(uuid())
+  publicId             String      @unique @map("public_id")
+  requirementId        String      @map("requirement_id")
+  name                 String
+  position             String?   @map("position")
+  jobFamily            String?   @map("job_family")
+  mobile               String
+  mobileNormalized     String      @map("mobile_normalized")
+  email                String
+  emailNormalized      String      @map("email_normalized")
+  source               String?
+  stageCode            String      @map("stage_code")
+  feedbackCode         String?     @map("feedback_code")
+  profileSubmittedDate DateTime?   @map("profile_submitted_date") @db.Date
+  clientShortlistDate  DateTime?   @map("client_shortlist_date") @db.Date
+  interviewRound       String?     @map("interview_round")
+  selected             Boolean     @default(false)
+  selectedAt           DateTime?   @map("selected_at")
+  remarks              String?
+  createdAt            DateTime    @default(now()) @map("created_at")
+  updatedAt            DateTime    @updatedAt @map("updated_at")
+  deletedAt            DateTime?   @map("deleted_at")
+  requirement          Requirement @relation(fields: [requirementId], references: [id])
+  offer                Offer?
+  onboarding           Onboarding?
+
+  @@index([requirementId])
+  @@index([mobileNormalized])
+  @@index([emailNormalized])
+  @@index([selected])
+  @@map("candidates")
+}
+
+model Offer {
+  id                 String      @id @default(uuid())
+  publicId           String      @unique @map("public_id")
+  candidateId        String      @unique @map("candidate_id")
+  requirementId      String      @map("requirement_id")
+  offerInitiatedDate DateTime?   @map("offer_initiated_date") @db.Date
+  offerReleasedDate  DateTime?   @map("offer_released_date") @db.Date
+  statusCode         String      @map("status_code")
+  ctcRate            String?     @map("ctc_rate")
+  expectedDoj        DateTime?   @map("expected_doj") @db.Date
+  remarks            String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  deletedAt          DateTime?   @map("deleted_at")
+  selectedDate       DateTime?   @map("selected_date") @db.Date
+  candidate          Candidate   @relation(fields: [candidateId], references: [id])
+  requirement        Requirement @relation(fields: [requirementId], references: [id])
+  onboarding         Onboarding?
+
+  @@index([requirementId])
+  @@index([statusCode])
+  @@map("offers")
+}
+
+model Onboarding {
+  id                 String      @id @default(uuid())
+  publicId           String      @unique @map("public_id")
+  offerId            String      @unique @map("offer_id")
+  candidateId        String      @unique @map("candidate_id")
+  requirementId      String      @map("requirement_id")
+  hrOwnerId          String      @map("hr_owner_id")
+  docsPending        Boolean     @default(true) @map("docs_pending")
+  bgvStatusCode      String      @map("bgv_status_code")
+  joiningFormalities String?     @map("joining_formalities")
+  expectedDoj        DateTime?   @map("expected_doj") @db.Date
+  actualDoj          DateTime?   @map("actual_doj") @db.Date
+  statusCode         String      @map("status_code")
+  remarks            String?
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+  deletedAt          DateTime?   @map("deleted_at")
+  offerAcceptedDate  DateTime?   @map("offer_accepted_date") @db.Date
+  candidate          Candidate   @relation(fields: [candidateId], references: [id])
+  hrOwner            User        @relation("HrOwner", fields: [hrOwnerId], references: [id])
+  offer              Offer       @relation(fields: [offerId], references: [id])
+  requirement        Requirement @relation(fields: [requirementId], references: [id])
+
+  @@index([requirementId])
+  @@index([statusCode])
+  @@map("onboardings")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  action      String
+  actorUserId String?  @map("actor_user_id")
+  beforeJson  Json?    @map("before_json")
+  afterJson   Json?    @map("after_json")
+  createdAt   DateTime @default(now()) @map("created_at")
+  actor       User?    @relation("ActorAudits", fields: [actorUserId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model IdSequence {
+  name  String @id
+  value Int    @default(0)
+
+  @@map("id_sequences")
+}
+
+enum Role {
+  ADMIN
+  SALES
+  TA
+  HR
+  LEADERSHIP_READONLY
+}
+
+enum RequirementStatus {
+  ACTIVE
+  ON_HOLD
+  CANCELLED
+  CLOSED
+}
