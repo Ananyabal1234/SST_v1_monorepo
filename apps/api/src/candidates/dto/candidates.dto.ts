@@ -45,7 +45,11 @@ export class CreateCandidateDto {
   @IsString()
   jobFamily?: string;
 
-  @ApiProperty({ example: 'SUBMITTED_TO_SPOC' })
+  @ApiProperty({
+    example: 'SUBMITTED_TO_SPOC',
+    description:
+      'Active CANDIDATE_STAGE lookup: SUBMITTED_TO_SPOC | CLIENT_SHORTLIST | HOLD | REJECT',
+  })
   @IsString()
   stageCode!: string;
 
@@ -76,7 +80,11 @@ export class CreateCandidateDto {
   @IsDateString()
   clientShortlistDate?: string | null;
 
-  @ApiPropertyOptional({ example: 'Round 1', nullable: true })
+  @ApiPropertyOptional({
+    example: 'L1',
+    nullable: true,
+    description: 'Active INTERVIEW_ROUND lookup: L1 | L2 | L3 | L4 | COMPLETED',
+  })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsString()
@@ -120,7 +128,11 @@ export class UpdateCandidateDto {
   @IsString()
   jobFamily?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 'CLIENT_SHORTLIST',
+    description:
+      'Active CANDIDATE_STAGE lookup: SUBMITTED_TO_SPOC | CLIENT_SHORTLIST | HOLD | REJECT',
+  })
   @IsOptional()
   @IsString()
   stageCode?: string;
@@ -152,7 +164,11 @@ export class UpdateCandidateDto {
   @IsDateString()
   clientShortlistDate?: string | null;
 
-  @ApiPropertyOptional({ nullable: true })
+  @ApiPropertyOptional({
+    example: 'L2',
+    nullable: true,
+    description: 'Active INTERVIEW_ROUND lookup: L1 | L2 | L3 | L4 | COMPLETED',
+  })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsString()

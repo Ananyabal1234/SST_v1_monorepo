@@ -139,6 +139,7 @@ export class OnboardingService {
 
     const where: Prisma.OnboardingWhereInput = {
       deletedAt: null,
+      offer: { statusCode: 'ACCEPTED', deletedAt: null },
       ...(query.statusCode
         ? { statusCode: query.statusCode }
         : {}),
@@ -208,10 +209,45 @@ export class OnboardingService {
       );
     }
 
-    if (offer.onboarding) {
+    // Prefer restoring a soft-deleted row for this offer (unique offerId).
+    const existing = await this.prisma.onboarding.findFirst({
+      where: { offerId: offer.id },
+    });
+    if (existing && !existing.deletedAt) {
       throw new ConflictException(
         'Onboarding already exists for this offer',
       );
+    }
+    if (existing?.deletedAt) {
+      const restored = await this.prisma.onboarding.update({
+        where: { id: existing.id },
+        data: {
+          deletedAt: null,
+          statusCode: 'DOCS_PENDING',
+          docsPending: true,
+          actualDoj: null,
+          hrOwnerId: dto.hrOwnerId ?? existing.hrOwnerId,
+          bgvStatusCode: dto.bgvStatusCode ?? existing.bgvStatusCode,
+          offerAcceptedDate: new Date(),
+        },
+        include: this.detailInclude,
+      });
+      await this.audit.log({
+        entityType: 'Onboarding',
+        entityId: restored.id,
+        action: 'STATUS',
+        actorUserId: actorId,
+        before: {
+          statusCode: existing.statusCode,
+          deletedAt: existing.deletedAt,
+        },
+        after: {
+          statusCode: restored.statusCode,
+          deletedAt: null,
+          reason: 'offer-reaccept-create',
+        },
+      });
+      return this.mapOnboardingRow(restored);
     }
 
     const req = await this.prisma.requirement.findFirst({
@@ -325,7 +361,8 @@ export class OnboardingService {
   }
 
   /**
-   * Soft-cancel / restore onboarding when offer status changes (pipeline cascade).
+   * Soft-delete / restore onboarding when offer status changes (pipeline cascade).
+   * Non-ACCEPTED offers remove the row from the Onboarding tab via soft-delete.
    */
   async syncFromOfferStatus(
     offerId: string,
@@ -334,11 +371,13 @@ export class OnboardingService {
   ): Promise<void> {
     const offer = await this.prisma.offer.findFirst({
       where: { id: offerId, deletedAt: null },
-      include: { onboarding: true },
     });
     if (!offer) return;
 
-    const onb = offer.onboarding;
+    // Include soft-deleted rows so re-accept can restore them.
+    const onb = await this.prisma.onboarding.findFirst({
+      where: { offerId },
+    });
     const next = offerStatus.trim().toUpperCase();
 
     if (next === 'ACCEPTED') {
@@ -346,32 +385,39 @@ export class OnboardingService {
         await this.createFromAcceptedOffer(offerId, actorId);
         return;
       }
-      if (onb.statusCode === 'BACKOUT' || onb.statusCode === 'ON_HOLD') {
-        const wasFilled = this.isFilledStatus(onb.statusCode);
-        const updated = await this.prisma.onboarding.update({
-          where: { id: onb.id },
-          data: {
-            statusCode: 'DOCS_PENDING',
-            docsPending: true,
-            actualDoj: null,
-          },
-        });
-        await this.audit.log({
-          entityType: 'Onboarding',
-          entityId: onb.id,
-          action: 'STATUS',
-          actorUserId: actorId,
-          before: { statusCode: onb.statusCode },
-          after: { statusCode: updated.statusCode, reason: 'offer-reaccept' },
-        });
-        if (wasFilled) {
-          await this.requirements.syncFillStatus(onb.requirementId, actorId);
-        }
+      const wasFilled =
+        this.isFilledStatus(onb.statusCode) && onb.deletedAt == null;
+      const updated = await this.prisma.onboarding.update({
+        where: { id: onb.id },
+        data: {
+          deletedAt: null,
+          statusCode: 'DOCS_PENDING',
+          docsPending: true,
+          actualDoj: null,
+        },
+      });
+      await this.audit.log({
+        entityType: 'Onboarding',
+        entityId: onb.id,
+        action: 'STATUS',
+        actorUserId: actorId,
+        before: {
+          statusCode: onb.statusCode,
+          deletedAt: onb.deletedAt,
+        },
+        after: {
+          statusCode: updated.statusCode,
+          deletedAt: null,
+          reason: 'offer-reaccept',
+        },
+      });
+      if (wasFilled) {
+        await this.requirements.syncFillStatus(onb.requirementId, actorId);
       }
       return;
     }
 
-    if (!onb) return;
+    if (!onb || onb.deletedAt) return;
 
     if (this.isFilledStatus(onb.statusCode)) {
       throw new BadRequestException(
@@ -386,20 +432,24 @@ export class OnboardingService {
       targetOnboarding = 'BACKOUT';
     }
 
-    if (!targetOnboarding || onb.statusCode === targetOnboarding) return;
+    if (!targetOnboarding) return;
 
     const updated = await this.prisma.onboarding.update({
       where: { id: onb.id },
-      data: { statusCode: targetOnboarding },
+      data: {
+        statusCode: targetOnboarding,
+        deletedAt: new Date(),
+      },
     });
     await this.audit.log({
       entityType: 'Onboarding',
       entityId: onb.id,
       action: 'STATUS',
       actorUserId: actorId,
-      before: { statusCode: onb.statusCode },
+      before: { statusCode: onb.statusCode, deletedAt: null },
       after: {
         statusCode: updated.statusCode,
+        deletedAt: updated.deletedAt,
         reason: `offer-cascade:${next}`,
       },
     });
@@ -413,11 +463,28 @@ export class OnboardingService {
     if (!before) throw new NotFoundException('Onboarding not found');
 
     // Offer status changes first so soft-cancel / re-accept cascade runs before local fields.
+    let demotedFromAccepted = false;
     if (dto.offerStatus !== undefined && dto.offerStatus !== null && dto.offerStatus !== '') {
       const nextOffer = String(dto.offerStatus).trim().toUpperCase();
-      if (nextOffer !== (before.offer?.statusCode ?? '').toUpperCase()) {
+      const prevOffer = (before.offer?.statusCode ?? '').toUpperCase();
+      if (nextOffer !== prevOffer) {
         await this.offers.applyStatusChange(before.offerId, nextOffer, actorId);
+        // Leaving ACCEPTED soft-deletes onboarding via syncFromOfferStatus — skip field updates.
+        if (prevOffer === 'ACCEPTED' && nextOffer !== 'ACCEPTED') {
+          demotedFromAccepted = true;
+        }
       }
+    }
+
+    if (demotedFromAccepted) {
+      const removed = await this.prisma.onboarding.findFirst({
+        where: { id: before.id },
+        include: this.detailInclude,
+      });
+      return {
+        ...this.mapOnboardingRow(removed ?? before),
+        message: 'Offer updated — candidate returned to Offers',
+      };
     }
 
     const current = await this.prisma.onboarding.findFirst({

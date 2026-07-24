@@ -115,6 +115,7 @@ export class DashboardService {
       this.prisma.candidate.count({
         where: {
           deletedAt: null,
+          selected: false,
           requirementId: { in: reqIds },
         },
       }),
@@ -124,7 +125,15 @@ export class DashboardService {
           selected: true,
           requirementId: { in: reqIds },
           NOT: {
-            onboarding: { statusCode: 'JOINED', deletedAt: null },
+            OR: [
+              { onboarding: { statusCode: 'JOINED', deletedAt: null } },
+              {
+                offer: {
+                  deletedAt: null,
+                  statusCode: { in: ['RELEASED', 'ACCEPTED'] },
+                },
+              },
+            ],
           },
         },
       }),
@@ -333,6 +342,7 @@ export class DashboardService {
       offersAccepted,
       offersRejected,
       candidatesJoined,
+      allCandidatesForDupes,
     ] = await Promise.all([
       this.prisma.user.findMany({
         where: { role: 'TA', deletedAt: null, isActive: true },
@@ -367,6 +377,7 @@ export class DashboardService {
       this.prisma.candidate.findMany({
         where: {
           deletedAt: null,
+          selected: false,
           requirement: this.requirementWhere(query),
         },
         select: candidateSelect,
@@ -378,7 +389,15 @@ export class DashboardService {
           selected: true,
           requirement: this.requirementWhere(query),
           NOT: {
-            onboarding: { statusCode: 'JOINED', deletedAt: null },
+            OR: [
+              { onboarding: { statusCode: 'JOINED', deletedAt: null } },
+              {
+                offer: {
+                  deletedAt: null,
+                  statusCode: { in: ['RELEASED', 'ACCEPTED'] },
+                },
+              },
+            ],
           },
         },
         select: candidateSelect,
@@ -441,11 +460,27 @@ export class DashboardService {
         },
         orderBy: { actualDoj: 'desc' },
       }),
+      this.prisma.candidate.findMany({
+        where: {
+          deletedAt: null,
+          requirement: this.requirementWhere(query),
+        },
+        select: {
+          id: true,
+          publicId: true,
+          name: true,
+          email: true,
+          mobile: true,
+          mobileNormalized: true,
+          requirementId: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
     ]);
 
     const reqIds = requirements.map((r) => r.id);
     const mobileCounts = new Map<string, number>();
-    for (const c of candidatesInPipeline) {
+    for (const c of allCandidatesForDupes) {
       if (!c.mobileNormalized) continue;
       mobileCounts.set(
         c.mobileNormalized,
@@ -478,7 +513,7 @@ export class DashboardService {
       (r) => r.status === 'CANCELLED',
     );
     const sourcedRequirementIds = new Set(
-      candidatesInPipeline.map((c) => c.requirementId),
+      allCandidatesForDupes.map((c) => c.requirementId),
     );
     const wastedSourcing = cancelledRequirements.filter(
       (r) => r.taHandoffDate != null || sourcedRequirementIds.has(r.id),
@@ -505,7 +540,7 @@ export class DashboardService {
     });
 
     const duplicateMobiles = duplicateMobileKeys.map((mobileNormalized) => {
-      const members = candidatesInPipeline.filter(
+      const members = allCandidatesForDupes.filter(
         (c) => c.mobileNormalized === mobileNormalized,
       );
       return {

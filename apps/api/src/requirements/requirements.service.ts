@@ -558,7 +558,7 @@ export class RequirementsService {
   }
 
   /** Recount joined fills and auto-close / reopen ACTIVE↔CLOSED.
-   * Any JOINED onboarding closes the requirement; zero JOINED reopens it.
+   * CLOSED only when JOINED count covers all seats; reopen when seats remain.
    */
   async syncFillStatus(
     requirementId: string,
@@ -581,9 +581,15 @@ export class RequirementsService {
     });
 
     let nextStatus: RequirementStatus | null = null;
-    if (joined >= 1 && (req.status === 'ACTIVE' || req.status === 'ON_HOLD')) {
+    if (
+      joined >= req.numberOfPositions &&
+      (req.status === 'ACTIVE' || req.status === 'ON_HOLD')
+    ) {
       nextStatus = 'CLOSED';
-    } else if (req.status === 'CLOSED' && joined === 0) {
+    } else if (
+      req.status === 'CLOSED' &&
+      joined < req.numberOfPositions
+    ) {
       nextStatus = 'ACTIVE';
     }
 

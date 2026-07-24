@@ -10,18 +10,27 @@ export class DashboardSummaryDto {
   @ApiProperty({ example: 16 })
   openPositions!: number;
 
-  @ApiProperty({ example: 1 })
+  @ApiProperty({
+    example: 1,
+    description:
+      'Closed positions = candidates with onboarding status JOINED (Total = Open + Closed)',
+  })
   closedPositions!: number;
 
   @ApiProperty({ example: 0 })
   pendingSalesHandoff!: number;
 
-  @ApiProperty({ example: 5 })
+  @ApiProperty({
+    example: 5,
+    description:
+      'Candidates not yet marked Selected (mutually exclusive funnel stage)',
+  })
   candidatesInPipeline!: number;
 
   @ApiProperty({
     example: 1,
-    description: 'Selected candidates who are not yet JOINED',
+    description:
+      'Selected candidates without RELEASED/ACCEPTED offer and not yet JOINED',
   })
   selectedCandidates!: number;
 
@@ -320,14 +329,16 @@ export class DashboardListsDto {
   pendingSalesHandoff!: Record<string, unknown>[];
 
   @ApiProperty({
-    description: 'Candidates in pipeline for filtered requirements',
+    description:
+      'Candidates not yet marked Selected (mutually exclusive funnel stage)',
     type: 'array',
     items: { type: 'object' },
   })
   candidatesInPipeline!: Record<string, unknown>[];
 
   @ApiProperty({
-    description: 'Selected candidates not yet JOINED',
+    description:
+      'Selected candidates without RELEASED/ACCEPTED offer and not yet JOINED',
     type: 'array',
     items: { type: 'object' },
   })

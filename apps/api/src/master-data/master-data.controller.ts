@@ -50,7 +50,7 @@ export class MasterDataController {
   @ApiParam({
     name: 'type',
     description:
-      'PRIORITY | CANDIDATE_STAGE | FEEDBACK | OFFER_STATUS | ONBOARDING_STATUS | BGV_STATUS | REQUIREMENT_STATUS',
+      'PRIORITY | CANDIDATE_STAGE | INTERVIEW_ROUND | FEEDBACK | OFFER_STATUS | ONBOARDING_STATUS | BGV_STATUS | REQUIREMENT_STATUS',
     example: 'PRIORITY',
   })
   @ApiOkResponse({ description: 'Lookup values' })
@@ -127,7 +127,7 @@ export class MasterDataController {
     operationId: 'createClient',
     summary: 'Create client (Admin/Sales)',
   })
-  @ApiCreatedResponse({ description: 'Created client' })
+  @ApiCreatedResponse({ description: 'Created or existing client' })
   @ApiMutateErrors()
   createClient(@Body() dto: CreateClientDto, @CurrentUser() user: AuthUser) {
     return this.master.createClient(dto, user.id);
@@ -161,13 +161,13 @@ export class MasterDataController {
     return this.master.listJobFamilies();
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SALES)
   @Post('job-families')
   @ApiOperation({
     operationId: 'createJobFamily',
-    summary: 'Create job family (Admin)',
+    summary: 'Create job family (Admin/Sales)',
   })
-  @ApiCreatedResponse({ description: 'Created job family' })
+  @ApiCreatedResponse({ description: 'Created or existing job family' })
   @ApiMutateErrors()
   createJobFamily(
     @Body() dto: CreateJobFamilyDto,
@@ -176,11 +176,11 @@ export class MasterDataController {
     return this.master.createJobFamily(dto, user.id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SALES)
   @Patch('job-families/:id')
   @ApiOperation({
     operationId: 'updateJobFamily',
-    summary: 'Update job family (Admin)',
+    summary: 'Update job family (Admin/Sales)',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ description: 'Updated job family' })

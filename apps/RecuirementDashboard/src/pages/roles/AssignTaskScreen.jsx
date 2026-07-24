@@ -7,25 +7,62 @@ import {
   IconWallet, IconMapPin, IconClock, IconPlus, IconEdit,
 } from '../../components/Icons';
 
+const FALLBACK_STAGES = [
+  { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
+  { code: 'CLIENT_SHORTLIST', label: 'Client Shortlist' },
+  { code: 'HOLD', label: 'Hold' },
+  { code: 'REJECT', label: 'Reject' },
+];
+
+const FALLBACK_ROUNDS = [
+  { code: 'L1', label: 'L1' },
+  { code: 'L2', label: 'L2' },
+  { code: 'L3', label: 'L3' },
+  { code: 'L4', label: 'L4' },
+  { code: 'COMPLETED', label: 'Completed' },
+];
+
 // Columns shown in the candidate table (editable on the same screen).
 const CANDIDATE_FIELDS = [
-  { key: 'candidateId', label: 'Candidate ID', type: 'text', required: false, locked: true },
-  { key: 'reqId', label: 'Req ID', type: 'text', required: true },
-  { key: 'position', label: 'Position', type: 'text', required: true },
-  { key: 'jobFamily', label: 'Job Family', type: 'text', required: true },
+  { key: 'candidateId', label: 'Candidate ID', type: 'text', required: false, locked: true, hideOnAdd: true },
+  { key: 'reqId', label: 'Req ID', type: 'text', required: true, locked: true },
+  { key: 'position', label: 'Position', type: 'text', required: true, locked: true },
+  { key: 'jobFamily', label: 'Job Family', type: 'text', required: true, locked: true },
   { key: 'candidateName', label: 'Candidate Name', type: 'text', required: true },
   { key: 'email', label: 'Email', type: 'text', required: true },
   { key: 'mobile', label: 'Mobile Number', type: 'text', required: true },
   { key: 'source', label: 'Source', type: 'text', required: true },
-  { key: 'candidateStage', label: 'Candidate Stage', type: 'text', required: true },
+  { key: 'candidateStage', label: 'Candidate Stage', type: 'select', required: true, optionsKey: 'candidateStages' },
   { key: 'feedbackStatus', label: 'Candidate Status', type: 'select', required: true, optionsKey: 'candidateStatuses' },
   { key: 'profileSubmittedDate', label: 'Profile Submitted Date', type: 'date', required: true },
   { key: 'clientShortlistDate', label: 'Client Shortlist Date', type: 'date', required: false },
-  { key: 'interviewRound', label: 'Interview Round', type: 'text', required: false },
+  { key: 'interviewRound', label: 'Interview Round', type: 'select', required: false, optionsKey: 'interviewRounds' },
   { key: 'remarks', label: 'Remarks', type: 'text', required: false },
 ];
 
 const EMPTY_CANDIDATE = Object.fromEntries(CANDIDATE_FIELDS.map((f) => [f.key, '']));
+
+function normalizeLookupList(res) {
+  const list = Array.isArray(res) ? res : res?.items || res?.data || [];
+  return list
+    .map((v) => ({
+      code: String(v.code || '').toUpperCase(),
+      label: v.label || v.code,
+    }))
+    .filter((v) => v.code);
+}
+
+function stageLabel(code, stages) {
+  if (!code) return '';
+  const found = stages.find((s) => s.code === String(code).toUpperCase());
+  return found?.label || code;
+}
+
+function roundLabel(code, rounds) {
+  if (!code) return '';
+  const found = rounds.find((r) => r.code === String(code).toUpperCase());
+  return found?.label || code;
+}
 
 export default function AssignTaskScreen() {
   const { user } = useAuth();
@@ -39,6 +76,8 @@ export default function AssignTaskScreen() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [candidateStatuses, setCandidateStatuses] = useState([]);
+  const [candidateStages, setCandidateStages] = useState(FALLBACK_STAGES);
+  const [interviewRounds, setInterviewRounds] = useState(FALLBACK_ROUNDS);
 
   useEffect(() => {
     let active = true;
@@ -64,7 +103,10 @@ export default function AssignTaskScreen() {
                 : null;
             return !currentEmail || !matchEmail || currentEmail === matchEmail;
           })
-          .map((r) => ({
+          .map((r) => {
+            const numberOfPositions = Number(r.numberOfPositions) || 0;
+            const closedPositions = Number(r.closedPositions) || 0;
+            return {
             id: r.id,
             publicId: r.publicId,
             clientName: r.client?.name || '—',
@@ -72,6 +114,8 @@ export default function AssignTaskScreen() {
             taOwner: r.taOwner?.fullName || '—',
             salesOwner: r.salesOwner?.fullName || '—',
             noOfPositions: r.numberOfPositions ?? '—',
+            closedPositions,
+            isCompleted: numberOfPositions > 0 && closedPositions >= numberOfPositions,
             jobFamily: r.jobFamily?.name || '—',
             minBudget: r.minBudget ?? '—',
             maxBudget: r.maxBudget ?? '—',
@@ -100,19 +144,32 @@ export default function AssignTaskScreen() {
                 interviewRound: c.interviewRound || '',
                 remarks: c.remarks || '',
               })),
-          }));
+          };
+          });
         setTasks(mapped);
         if (mapped.length) setSelectedTaskId(mapped[0].id);
       })
       .catch(() => active && setTasks([]))
       .finally(() => active && setLoading(false));
-    // Fetch candidate status options for the dropdown.
+
     get(ENDPOINTS.CANDIDATE_STATUS)
       .then((res) => {
         const list = Array.isArray(res) ? res : res?.items || res?.data || [];
         active && setCandidateStatuses(list);
       })
       .catch(() => active && setCandidateStatuses([]));
+
+    Promise.all([
+      get(`${ENDPOINTS.LOOKUPS}/CANDIDATE_STAGE`).catch(() => null),
+      get(`${ENDPOINTS.LOOKUPS}/INTERVIEW_ROUND`).catch(() => null),
+    ]).then(([stageRes, roundRes]) => {
+      if (!active) return;
+      const stages = normalizeLookupList(stageRes);
+      const rounds = normalizeLookupList(roundRes);
+      if (stages.length) setCandidateStages(stages);
+      if (rounds.length) setInterviewRounds(rounds);
+    });
+
     return () => { active = false; };
   }, []);
 
@@ -122,11 +179,11 @@ export default function AssignTaskScreen() {
     setEditing(null);
     setForm({
       ...EMPTY_CANDIDATE,
-      candidateId: 'C-' + String(Date.now()).slice(-6),
       requirementId: task.id,
       reqId: task.publicId || task.id,
       position: task.position,
       jobFamily: task.jobFamily,
+      candidateStage: 'SUBMITTED_TO_SPOC',
     });
     setError(null); setSuccess(null); setShowForm(true);
   };
@@ -143,10 +200,25 @@ export default function AssignTaskScreen() {
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
+  const formFields = CANDIDATE_FIELDS.filter((f) => editing || !f.hideOnAdd);
+
+  const resolveSelectOptions = (f) => {
+    if (f.optionsKey === 'candidateStatuses') {
+      return candidateStatuses.map((opt) => ({ value: opt, label: opt }));
+    }
+    if (f.optionsKey === 'candidateStages') {
+      return candidateStages.map((s) => ({ value: s.code, label: s.label }));
+    }
+    if (f.optionsKey === 'interviewRounds') {
+      return interviewRounds.map((r) => ({ value: r.code, label: r.label }));
+    }
+    return [];
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null); setSuccess(null);
-    const missing = CANDIDATE_FIELDS.filter((f) => f.required && !String(form[f.key]).trim());
+    const missing = formFields.filter((f) => f.required && !String(form[f.key]).trim());
     if (missing.length) {
       setError(`Please fill: ${missing.map((m) => m.label).join(', ')}`);
       return;
@@ -231,7 +303,7 @@ export default function AssignTaskScreen() {
       }
       closeForm();
     } catch (err) {
-      setError('Failed to save. Please try again.');
+      setError(err?.message || 'Failed to save. Please try again.');
     }
   };
 
@@ -254,7 +326,7 @@ export default function AssignTaskScreen() {
           {tasks.map((t) => (
             <button
               key={t.id}
-              className={`task-card ${selectedTaskId === t.id ? 'active' : ''}`}
+              className={`task-card ${selectedTaskId === t.id ? 'active' : ''}${t.isCompleted ? ' task-card--completed' : ''}`}
               onClick={() => setSelectedTaskId(t.id)}
             >
               <div className="task-card-top">
@@ -312,11 +384,17 @@ export default function AssignTaskScreen() {
                     )}
                     {selectedTask.candidates.map((c) => (
                       <tr key={c.candidateId} onClick={() => openCandidateDetails(c)}>
-                        {CANDIDATE_FIELDS.map((f) => (
-                          <td key={f.key}>
-                            {c[f.key] || '—'}
-                          </td>
-                        ))}
+                        {CANDIDATE_FIELDS.map((f) => {
+                          let display = c[f.key] || '—';
+                          if (f.key === 'candidateStage' && c[f.key]) {
+                            display = stageLabel(c[f.key], candidateStages);
+                          } else if (f.key === 'interviewRound' && c[f.key]) {
+                            display = roundLabel(c[f.key], interviewRounds);
+                          }
+                          return (
+                            <td key={f.key}>{display}</td>
+                          );
+                        })}
                         <td>
                           <button className="cand-edit" onClick={(e) => { e.stopPropagation(); openEdit(c); }} title="Edit">
                             <IconEdit /> Edit
@@ -332,13 +410,12 @@ export default function AssignTaskScreen() {
                 <div className="modal-overlay" onClick={closeCandidateDetails}>
                   <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
                     <div className="modal-head">
-                      <h3>Candidate Details — {viewingCandidate.candidateId}</h3>
+                      <h3>Candidate Details — {viewingCandidate.candidateId || viewingCandidate.publicId || '—'}</h3>
                       <button className="modal-close" onClick={closeCandidateDetails} title="Close">×</button>
                     </div>
                     <div className="modal-body">
                       <div className="detail-grid">
-                        <div className="detail-field"><span className="detail-label">Candidate ID</span><input value={viewingCandidate.candidateId || ''} readOnly /></div>
-                        <div className="detail-field"><span className="detail-label">Public ID</span><input value={viewingCandidate.publicId || ''} readOnly /></div>
+                        <div className="detail-field"><span className="detail-label">Candidate ID</span><input value={viewingCandidate.candidateId || viewingCandidate.publicId || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Req ID</span><input value={viewingCandidate.reqId || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Position</span><input value={viewingCandidate.position || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Job Family</span><input value={viewingCandidate.jobFamily || ''} readOnly /></div>
@@ -346,11 +423,11 @@ export default function AssignTaskScreen() {
                         <div className="detail-field"><span className="detail-label">Email</span><input value={viewingCandidate.email || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Mobile</span><input value={viewingCandidate.mobile || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Source</span><input value={viewingCandidate.source || ''} readOnly /></div>
-                        <div className="detail-field"><span className="detail-label">Candidate Stage</span><input value={viewingCandidate.candidateStage || ''} readOnly /></div>
+                        <div className="detail-field"><span className="detail-label">Candidate Stage</span><input value={stageLabel(viewingCandidate.candidateStage, candidateStages)} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Candidate Status</span><input value={viewingCandidate.feedbackStatus || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Profile Submitted</span><input value={viewingCandidate.profileSubmittedDate || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Client Shortlist Date</span><input value={viewingCandidate.clientShortlistDate || ''} readOnly /></div>
-                        <div className="detail-field"><span className="detail-label">Interview Round</span><input value={viewingCandidate.interviewRound || ''} readOnly /></div>
+                        <div className="detail-field"><span className="detail-label">Interview Round</span><input value={roundLabel(viewingCandidate.interviewRound, interviewRounds)} readOnly /></div>
                         <div className="detail-field full"><span className="detail-label">Remarks</span><textarea value={viewingCandidate.remarks || ''} readOnly /></div>
                       </div>
                     </div>
@@ -364,10 +441,15 @@ export default function AssignTaskScreen() {
                 <form className="cand-form" onSubmit={handleSubmit}>
                   <h4 className="cand-form-title">{editing ? 'Edit Candidate' : 'Add Candidate'}</h4>
                   <div className="cand-form-grid">
-                    {CANDIDATE_FIELDS.map((f) => {
-                      const options = f.optionsKey ? (f.optionsKey === 'candidateStatuses' ? candidateStatuses : []) : [];
-                      const renderedOptions = f.key === 'feedbackStatus' && form[f.key]
-                        ? Array.from(new Set([form[f.key], ...options]))
+                    {formFields.map((f) => {
+                      const options = resolveSelectOptions(f);
+                      const current = form[f.key] ?? '';
+                      const needsCurrent =
+                        f.type === 'select' &&
+                        current &&
+                        !options.some((o) => o.value === current || o.value === String(current).toUpperCase());
+                      const renderedOptions = needsCurrent
+                        ? [{ value: current, label: current }, ...options]
                         : options;
                       return (
                       <label key={f.key} className="cand-field">
@@ -381,7 +463,7 @@ export default function AssignTaskScreen() {
                           >
                             <option value="">Select…</option>
                             {renderedOptions.map((opt) => (
-                              <option key={opt} value={opt}>{opt}</option>
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                           </select>
                         ) : (

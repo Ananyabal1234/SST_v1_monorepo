@@ -11,13 +11,17 @@ const LOOKUPS: Record<string, { code: string; label: string }[]> = {
     { code: 'LOW', label: 'Low' },
   ],
   CANDIDATE_STAGE: [
-    { code: 'SOURCED', label: 'Sourced' },
     { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
     { code: 'CLIENT_SHORTLIST', label: 'Client Shortlist' },
-    { code: 'INTERVIEW', label: 'Interview' },
-    { code: 'SELECTED', label: 'Selected' },
-    { code: 'REJECTED', label: 'Rejected' },
-    { code: 'ON_HOLD', label: 'On Hold' },
+    { code: 'HOLD', label: 'Hold' },
+    { code: 'REJECT', label: 'Reject' },
+  ],
+  INTERVIEW_ROUND: [
+    { code: 'L1', label: 'L1' },
+    { code: 'L2', label: 'L2' },
+    { code: 'L3', label: 'L3' },
+    { code: 'L4', label: 'L4' },
+    { code: 'COMPLETED', label: 'Completed' },
   ],
   FEEDBACK: [
     { code: 'PENDING', label: 'Pending' },
@@ -79,39 +83,6 @@ async function main() {
     update: { passwordHash, isActive: true, deletedAt: null },
   });
 
-  const sales = await prisma.user.upsert({
-    where: { email: 'sales@sst.local' },
-    create: {
-      email: 'sales@sst.local',
-      fullName: 'Sam Sales',
-      role: Role.SALES,
-      passwordHash: await bcrypt.hash('ChangeMeNow!', 10),
-    },
-    update: {},
-  });
-
-  const ta = await prisma.user.upsert({
-    where: { email: 'ta@sst.local' },
-    create: {
-      email: 'ta@sst.local',
-      fullName: 'Tara Talent',
-      role: Role.TA,
-      passwordHash: await bcrypt.hash('ChangeMeNow!', 10),
-    },
-    update: {},
-  });
-
-  const hr = await prisma.user.upsert({
-    where: { email: 'hr@sst.local' },
-    create: {
-      email: 'hr@sst.local',
-      fullName: 'Hank HR',
-      role: Role.HR,
-      passwordHash: await bcrypt.hash('ChangeMeNow!', 10),
-    },
-    update: {},
-  });
-
   for (const [code, values] of Object.entries(LOOKUPS)) {
     const type = await prisma.lookupType.upsert({
       where: { code },
@@ -134,8 +105,12 @@ async function main() {
       });
     }
 
-    // Deactivate obsolete HR workflow codes replaced by HOLD/BACKOUT / new onboarding states
-    if (code === 'OFFER_STATUS' || code === 'ONBOARDING_STATUS') {
+    // Deactivate obsolete codes replaced by the current lookup set
+    if (
+      code === 'OFFER_STATUS' ||
+      code === 'ONBOARDING_STATUS' ||
+      code === 'CANDIDATE_STAGE'
+    ) {
       const keep = new Set(values.map((v) => v.code));
       await prisma.lookupValue.updateMany({
         where: {
@@ -158,13 +133,58 @@ async function main() {
   });
   // IN_PROGRESS is a first-class UI onboarding status — do not migrate away
 
-  const client = await prisma.client.upsert({
+  // Migrate legacy candidate stage codes
+  await prisma.candidate.updateMany({
+    where: { stageCode: 'ON_HOLD' },
+    data: { stageCode: 'HOLD' },
+  });
+  await prisma.candidate.updateMany({
+    where: { stageCode: 'REJECTED' },
+    data: { stageCode: 'REJECT' },
+  });
+  await prisma.candidate.updateMany({
+    where: { stageCode: { in: ['SOURCED', 'INTERVIEW', 'SELECTED'] } },
+    data: { stageCode: 'SUBMITTED_TO_SPOC' },
+  });
+
+  // Normalize free-text interview rounds to L1–L4 / COMPLETED where practical
+  const roundMigrations: { match: string[]; code: string }[] = [
+    { match: ['L1', 'ROUND 1', 'ROUND1', 'R1'], code: 'L1' },
+    { match: ['L2', 'ROUND 2', 'ROUND2', 'R2'], code: 'L2' },
+    { match: ['L3', 'ROUND 3', 'ROUND3', 'R3'], code: 'L3' },
+    { match: ['L4', 'ROUND 4', 'ROUND4', 'R4', 'FINAL'], code: 'L4' },
+    { match: ['COMPLETED', 'COMPLETE', 'DONE'], code: 'COMPLETED' },
+  ];
+  const candidatesWithRound = await prisma.candidate.findMany({
+    where: { interviewRound: { not: null }, deletedAt: null },
+    select: { id: true, interviewRound: true },
+  });
+  for (const cand of candidatesWithRound) {
+    const raw = (cand.interviewRound ?? '').trim().toUpperCase();
+    if (!raw) continue;
+    if (['L1', 'L2', 'L3', 'L4', 'COMPLETED'].includes(raw)) {
+      if (cand.interviewRound !== raw) {
+        await prisma.candidate.update({
+          where: { id: cand.id },
+          data: { interviewRound: raw },
+        });
+      }
+      continue;
+    }
+    const mapped = roundMigrations.find((m) => m.match.includes(raw));
+    await prisma.candidate.update({
+      where: { id: cand.id },
+      data: { interviewRound: mapped ? mapped.code : null },
+    });
+  }
+
+  await prisma.client.upsert({
     where: { nameNormalized: 'acme corp' },
     create: { name: 'Acme Corp', nameNormalized: 'acme corp' },
     update: {},
   });
 
-  const jobFamily = await prisma.jobFamily.upsert({
+  await prisma.jobFamily.upsert({
     where: { name: 'Engineering' },
     create: { name: 'Engineering' },
     update: {},
@@ -191,42 +211,9 @@ async function main() {
     update: {},
   });
 
-  const existingReq = await prisma.requirement.findFirst({
-    where: { publicId: 'REQ-00001' },
-  });
-  if (!existingReq) {
-    await prisma.idSequence.update({
-      where: { name: 'requirement' },
-      data: { value: 1 },
-    });
-    await prisma.requirement.create({
-      data: {
-        publicId: 'REQ-00001',
-        requirementDate: new Date(),
-        clientId: client.id,
-        roleSkill: 'Core Python Developer',
-        jobFamilyId: jobFamily.id,
-        numberOfPositions: 2,
-        salesOwnerId: sales.id,
-        taOwnerId: ta.id,
-        priorityCode: 'HIGH',
-        taHandoffDate: new Date(),
-        targetClosureDate: new Date(Date.now() + 7 * 86400000),
-        experience: '5+ years',
-        jobLocation: 'Bangalore',
-        minBudget: 1000000,
-        maxBudget: 1500000,
-        durationMonths: 12,
-      },
-    });
-  }
-
   // eslint-disable-next-line no-console
   console.log('Seeded users:', {
     admin: admin.email,
-    sales: sales.email,
-    ta: ta.email,
-    hr: hr.email,
   });
 }
 

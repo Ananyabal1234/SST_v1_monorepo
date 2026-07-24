@@ -179,7 +179,12 @@ export default function OffersScreen() {
         remarks: form.remarks || '',
       };
       const res = await patch(`${ENDPOINTS.OFFERS}/${editingId}`, payload);
-      setSuccess(res?.message || 'Offer updated successfully');
+      const nextStatus = String(form.statusCode || '').toUpperCase();
+      setSuccess(
+        nextStatus === 'ACCEPTED'
+          ? (res?.message || 'Offer accepted — candidate moved to Onboarding')
+          : (res?.message || 'Offer updated successfully'),
+      );
       setModalOpen(false);
       await loadOffers();
     } catch (err) {
@@ -195,13 +200,17 @@ export default function OffersScreen() {
 
   if (loading) return <div className="screen-loading"><div className="spinner" /></div>;
 
+  const visibleOffers = offers.filter(
+    (o) => String(o.offerStatus || o.statusCode || '').toUpperCase() !== 'ACCEPTED',
+  );
+
   return (
     <div className="hr-candidates">
       <div className="assign-head">
         <span className="assign-badge"><IconCheckCircle /></span>
         <div>
           <h2 className="assign-title">Offers</h2>
-          <p className="assign-sub">View and update candidate offers.</p>
+          <p className="assign-sub">View and update candidate offers (Accepted offers move to Onboarding).</p>
         </div>
       </div>
 
@@ -229,10 +238,10 @@ export default function OffersScreen() {
             </tr>
           </thead>
           <tbody>
-            {offers.length === 0 && (
+            {visibleOffers.length === 0 && (
               <tr><td colSpan={14} className="cand-empty">No offers found.</td></tr>
             )}
-            {offers.map((o) => {
+            {visibleOffers.map((o) => {
               const row = offerRow(o, selectOptions);
               return (
                 <tr key={row.id || row.publicId}>

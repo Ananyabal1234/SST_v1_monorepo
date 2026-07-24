@@ -157,16 +157,16 @@ export async function get(endpoint) {
   if (!isLiveEndpoint(endpoint)) return mockRequest(endpoint);
   try {
     const { data } = await client.get(endpoint);
-    // Treat empty/undefined responses as "no data" and fall back to dummy.
-    if (data == null || (Array.isArray(data) && data.length === 0) ||
-        (data && Array.isArray(data.items) && data.items.length === 0)) {
-      console.warn(`[API FALLBACK] GET ${endpoint} returned empty, using dummy data`);
+    // Empty arrays are valid (e.g. no sales/TA users yet). Do NOT fall back to
+    // mock data — mock ids are not real UUIDs and break create/update calls.
+    if (data == null) {
+      console.warn(`[API FALLBACK] GET ${endpoint} returned null, using dummy data`);
       return mockRequest(endpoint);
     }
     return data;
   } catch (err) {
-    // Live call failed — fall back to dummy data (auth endpoints excluded).
-    if (isAuthEndpoint(endpoint)) throw err;
+    // Live master-data / writes must surface real errors — mock ids cause 400s.
+    if (isAuthEndpoint(endpoint) || isLiveEndpoint(endpoint)) throw err;
     console.warn(`[API FALLBACK] GET ${endpoint} failed, using dummy data`, err?.message);
     return mockRequest(endpoint);
   }
@@ -201,8 +201,8 @@ async function mockRequest(endpoint, body) {
   if (endpoint.includes('/reports/onboarding')) return mockOnboarding();
   if (endpoint.includes('/reports/admin')) return mockAdmin();
   if (endpoint.includes('/requests')) return mockAddRequest(body);
-  if (endpoint.includes('/master-data/job-families')) return mockJobFamilies();
-  if (endpoint.includes('/master-data/clients')) return mockClients();
+  if (endpoint.includes('/master-data/job-families')) return mockJobFamilies(body);
+  if (endpoint.includes('/master-data/clients')) return mockClients(body);
   if (endpoint.includes('/master-data/sales-members')) return mockSalesMembers();
   if (endpoint.includes('/master-data/ta-members')) return mockTaMembers();
   if (endpoint.includes('/master-data/candidate-status')) return mockCandidateStatus();
@@ -426,20 +426,58 @@ function mockAddRequest(body) {
 }
 
 // ---- Master-data + users fallbacks (used when the live API fails) ----
-function mockJobFamilies() {
-  return [
-    { id: 'jf-eng', name: 'Engineering', createdAt: '', updatedAt: '', deletedAt: null },
-    { id: 'jf-sales', name: 'Sales', createdAt: '', updatedAt: '', deletedAt: null },
-    { id: 'jf-fin', name: 'Finance', createdAt: '', updatedAt: '', deletedAt: null },
-  ];
+let mockJobFamiliesStore = [
+  { id: 'jf-eng', name: 'Engineering', createdAt: '', updatedAt: '', deletedAt: null },
+  { id: 'jf-sales', name: 'Sales', createdAt: '', updatedAt: '', deletedAt: null },
+  { id: 'jf-fin', name: 'Finance', createdAt: '', updatedAt: '', deletedAt: null },
+];
+
+let mockClientsStore = [
+  { id: 'c-acme', name: 'Acme Corp', nameNormalized: 'acme corp', createdAt: '', updatedAt: '', deletedAt: null },
+  { id: 'c-globex', name: 'Globex', nameNormalized: 'globex', createdAt: '', updatedAt: '', deletedAt: null },
+  { id: 'c-initech', name: 'Initech', nameNormalized: 'initech', createdAt: '', updatedAt: '', deletedAt: null },
+];
+
+function mockJobFamilies(body) {
+  if (body?.name) {
+    const name = String(body.name).trim();
+    const existing = mockJobFamiliesStore.find(
+      (jf) => jf.name.toLowerCase() === name.toLowerCase() && !jf.deletedAt,
+    );
+    if (existing) return existing;
+    const row = {
+      id: 'jf-' + Date.now(),
+      name,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+    mockJobFamiliesStore = [...mockJobFamiliesStore, row];
+    return row;
+  }
+  return mockJobFamiliesStore.filter((jf) => !jf.deletedAt);
 }
 
-function mockClients() {
-  return [
-    { id: 'c-acme', name: 'Acme Corp', nameNormalized: 'acme corp', createdAt: '', updatedAt: '', deletedAt: null },
-    { id: 'c-globex', name: 'Globex', nameNormalized: 'globex', createdAt: '', updatedAt: '', deletedAt: null },
-    { id: 'c-initech', name: 'Initech', nameNormalized: 'initech', createdAt: '', updatedAt: '', deletedAt: null },
-  ];
+function mockClients(body) {
+  if (body?.name) {
+    const name = String(body.name).trim();
+    const nameNormalized = name.toLowerCase();
+    const existing = mockClientsStore.find(
+      (c) => c.nameNormalized === nameNormalized && !c.deletedAt,
+    );
+    if (existing) return existing;
+    const row = {
+      id: 'c-' + Date.now(),
+      name,
+      nameNormalized,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      deletedAt: null,
+    };
+    mockClientsStore = [...mockClientsStore, row];
+    return row;
+  }
+  return mockClientsStore.filter((c) => !c.deletedAt);
 }
 
 function mockUsers(body, endpoint) {
@@ -502,7 +540,25 @@ function mockLookups(endpoint) {
       { code: 'RELEASED', label: 'Released' },
       { code: 'ACCEPTED', label: 'Accepted' },
       { code: 'DECLINED', label: 'Declined' },
-      { code: 'WITHDRAWN', label: 'Withdrawn' },
+      { code: 'HOLD', label: 'Hold' },
+      { code: 'BACKOUT', label: 'Backout' },
+    ];
+  }
+  if (type === 'CANDIDATE_STAGE') {
+    return [
+      { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
+      { code: 'CLIENT_SHORTLIST', label: 'Client Shortlist' },
+      { code: 'HOLD', label: 'Hold' },
+      { code: 'REJECT', label: 'Reject' },
+    ];
+  }
+  if (type === 'INTERVIEW_ROUND') {
+    return [
+      { code: 'L1', label: 'L1' },
+      { code: 'L2', label: 'L2' },
+      { code: 'L3', label: 'L3' },
+      { code: 'L4', label: 'L4' },
+      { code: 'COMPLETED', label: 'Completed' },
     ];
   }
   return [];
@@ -536,8 +592,8 @@ const mockTasksStore = [
     taOwner: 'A. Khan', jobFamily: 'Engineering', minBudget: 50000, maxBudget: 80000,
     jobLocation: 'Bangalore', duration: '6 months',
     candidates: [
-      { candidateId: 'C-001', reqId: 'REQ-1001', position: 'Senior React Engineer', jobFamily: 'Engineering', candidateName: 'Rahul Mehra', email: 'rahul.m@mail.com', mobile: '9876500001', source: 'Naukri', candidateStage: 'Interview', feedbackStatus: 'Positive', profileSubmittedDate: '2026-07-01', clientShortlistDate: '2026-07-05', interviewRound: 'Round 2', pipelineAge: 15, candidateRag: 'Green', closureStatus: 'Open' },
-      { candidateId: 'C-002', reqId: 'REQ-1001', position: 'Senior React Engineer', jobFamily: 'Engineering', candidateName: 'Priya Nair', email: 'priya.n@mail.com', mobile: '9876500002', source: 'Referral', candidateStage: 'Shortlist', feedbackStatus: 'Pending', profileSubmittedDate: '2026-07-03', clientShortlistDate: '', interviewRound: '', pipelineAge: 13, candidateRag: 'Amber', closureStatus: 'Open' },
+      { candidateId: 'C-001', reqId: 'REQ-1001', position: 'Senior React Engineer', jobFamily: 'Engineering', candidateName: 'Rahul Mehra', email: 'rahul.m@mail.com', mobile: '9876500001', source: 'Naukri', candidateStage: 'CLIENT_SHORTLIST', feedbackStatus: 'Positive', profileSubmittedDate: '2026-07-01', clientShortlistDate: '2026-07-05', interviewRound: 'L2', pipelineAge: 15, candidateRag: 'Green', closureStatus: 'Open' },
+      { candidateId: 'C-002', reqId: 'REQ-1001', position: 'Senior React Engineer', jobFamily: 'Engineering', candidateName: 'Priya Nair', email: 'priya.n@mail.com', mobile: '9876500002', source: 'Referral', candidateStage: 'SUBMITTED_TO_SPOC', feedbackStatus: 'Pending', profileSubmittedDate: '2026-07-03', clientShortlistDate: '', interviewRound: '', pipelineAge: 13, candidateRag: 'Amber', closureStatus: 'Open' },
     ],
   },
   {
@@ -546,7 +602,7 @@ const mockTasksStore = [
     taOwner: 'R. Singh', jobFamily: 'Sales', minBudget: 30000, maxBudget: 45000,
     jobLocation: 'Mumbai', duration: '4 months',
     candidates: [
-      { candidateId: 'C-003', reqId: 'REQ-1002', position: 'Sales Executive', jobFamily: 'Sales', candidateName: 'Arjun Rao', email: 'arjun.r@mail.com', mobile: '9876500003', source: 'LinkedIn', candidateStage: 'Offer', feedbackStatus: 'Positive', profileSubmittedDate: '2026-06-20', clientShortlistDate: '2026-06-25', interviewRound: 'Final', pipelineAge: 26, candidateRag: 'Green', closureStatus: 'Offer Rolled Out' },
+      { candidateId: 'C-003', reqId: 'REQ-1002', position: 'Sales Executive', jobFamily: 'Sales', candidateName: 'Arjun Rao', email: 'arjun.r@mail.com', mobile: '9876500003', source: 'LinkedIn', candidateStage: 'CLIENT_SHORTLIST', feedbackStatus: 'Positive', profileSubmittedDate: '2026-06-20', clientShortlistDate: '2026-06-25', interviewRound: 'L4', pipelineAge: 26, candidateRag: 'Green', closureStatus: 'Offer Rolled Out' },
     ],
   },
   {

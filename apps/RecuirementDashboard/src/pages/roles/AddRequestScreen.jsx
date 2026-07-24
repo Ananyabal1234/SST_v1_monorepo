@@ -6,9 +6,9 @@ import { IconBriefcase, IconUser, IconTarget, IconFolderOpen, IconWallet, IconMa
 
 const EMPTY = {
   requirementDate: '',
-  clientId: '',
+  clientName: '',
   roleSkill: '',
-  jobFamilyId: '',
+  jobFamilyName: '',
   numberOfPositions: '',
   salesOwnerId: '',
   priorityCode: 'HIGH',
@@ -27,10 +27,10 @@ const PRIORITY_OPTIONS = ['HIGH', 'MEDIUM', 'LOW'];
 
 const FIELDS = [
   { key: 'requirementDate', label: 'Requirement Date', type: 'date', icon: IconCalendar, required: true },
-  { key: 'clientId', label: 'Client', type: 'select-client', icon: IconBriefcase, required: true },
+  { key: 'clientName', label: 'Client', type: 'combobox-client', icon: IconBriefcase, required: true, placeholder: 'Select or type a client' },
   { key: 'roleSkill', label: 'Role / Skill', type: 'text', icon: IconUser, placeholder: 'e.g. Core Python Developer', required: true },
-  { key: 'jobFamilyId', label: 'Job Family', type: 'select-jobfamily', icon: IconFolderOpen, required: true },
-  { key: 'numberOfPositions', label: 'Number of Positions', type: 'number', icon: IconTarget, placeholder: 'e.g. 5', required: true, min: 0 },
+  { key: 'jobFamilyName', label: 'Job Family', type: 'combobox-jobfamily', icon: IconFolderOpen, required: true, placeholder: 'Select or type a job family' },
+  { key: 'numberOfPositions', label: 'Number of Positions', type: 'number', icon: IconTarget, placeholder: 'e.g. 5', required: true, min: 1 },
   { key: 'salesOwnerId', label: 'Sales Owner', type: 'select-owner', ownerSource: 'sales', icon: IconUser, required: true },
   { key: 'priorityCode', label: 'Priority', type: 'select', icon: IconFlag, options: PRIORITY_OPTIONS, required: true },
   { key: 'taOwnerId', label: 'TA Owner', type: 'select-owner', ownerSource: 'ta', icon: IconUser, required: true },
@@ -40,9 +40,15 @@ const FIELDS = [
   { key: 'jobLocation', label: 'Job Location', type: 'text', icon: IconMapPin, placeholder: 'e.g. Bangalore', required: true },
   { key: 'minBudget', label: 'Min Budget', type: 'number', icon: IconWallet, placeholder: 'e.g. 50000', required: true, min: 0 },
   { key: 'maxBudget', label: 'Max Budget', type: 'number', icon: IconWallet, placeholder: 'e.g. 80000', required: true, min: 0 },
-  { key: 'durationMonths', label: 'Duration (Months)', type: 'number', icon: IconClock, placeholder: 'e.g. 6', required: true, min: 0 },
+  { key: 'durationMonths', label: 'Duration (Months)', type: 'number', icon: IconClock, placeholder: 'e.g. 6', required: true, min: 1 },
   { key: 'remarks', label: 'Job Description', type: 'text', icon: IconBriefcase, placeholder: 'Optional job description', required: false },
 ];
+
+function findByName(list, name) {
+  const needle = String(name || '').trim().toLowerCase();
+  if (!needle) return null;
+  return list.find((item) => String(item.name || '').trim().toLowerCase() === needle) || null;
+}
 
 export default function AddRequestScreen() {
   const [form, setForm] = useState(EMPTY);
@@ -87,9 +93,17 @@ export default function AddRequestScreen() {
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
-  const resolveClientId = (input) => {
-    const match = clients.find((c) => c.name === input);
-    return match ? match.id : input;
+  const ensureMasterRecord = async (list, setList, name, createUrl) => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed) throw new Error('Name is required');
+    const existing = findByName(list, trimmed);
+    if (existing) return existing.id;
+
+    const created = await post(createUrl, { name: trimmed });
+    const row = created?.id ? created : created?.data || created;
+    if (!row?.id) throw new Error(`Failed to create "${trimmed}"`);
+    setList((prev) => (findByName(prev, row.name || trimmed) ? prev : [...prev, row]));
+    return row.id;
   };
 
   const handleSubmit = async (e) => {
@@ -100,6 +114,14 @@ export default function AddRequestScreen() {
     const missing = FIELDS.filter((f) => f.required && !String(form[f.key]).trim());
     if (missing.length) {
       setError(`Please fill: ${missing.map((m) => m.label).join(', ')}`);
+      return;
+    }
+    if (!salesMembers.length) {
+      setError('No Sales users found. Create a Sales user from Admin first.');
+      return;
+    }
+    if (!taMembers.length) {
+      setError('No TA users found. Create a TA user from Admin first.');
       return;
     }
 
@@ -113,11 +135,25 @@ export default function AddRequestScreen() {
         const n = Number(v);
         return Number.isFinite(n) ? n : undefined;
       };
+
+      const clientId = await ensureMasterRecord(
+        clients,
+        setClients,
+        form.clientName,
+        ENDPOINTS.CLIENTS,
+      );
+      const jobFamilyId = await ensureMasterRecord(
+        jobFamilies,
+        setJobFamilies,
+        form.jobFamilyName,
+        ENDPOINTS.JOB_FAMILIES,
+      );
+
       const payload = {
         requirementDate: form.requirementDate,
-        clientId: resolveClientId(form.clientId),
+        clientId,
         roleSkill: form.roleSkill,
-        jobFamilyId: form.jobFamilyId,
+        jobFamilyId,
         numberOfPositions: toInt(form.numberOfPositions),
         salesOwnerId: form.salesOwnerId,
         priorityCode: form.priorityCode,
@@ -134,20 +170,18 @@ export default function AddRequestScreen() {
       console.log('[AddRequest] payload ->', payload);
       const res = await post(ENDPOINTS.ADD_REQUEST, payload);
       // Persist locally so the Sales screen can list "My Requirements".
-      const clientName = clients.find((c) => c.id === form.clientId)?.name;
-      const jobFamilyName = jobFamilies.find((jf) => jf.id === form.jobFamilyId)?.name;
       addRequirement({
         id: res?.request?.id || res?.id,
         status: res?.request?.status || 'Submitted',
-        clientName,
-        jobFamilyName,
+        clientName: form.clientName.trim(),
+        jobFamilyName: form.jobFamilyName.trim(),
         ...payload,
       });
       setSuccess(res.message || 'Requirement created successfully');
       setForm(EMPTY);
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to submit request. Please try again.';
-      setError(msg);
+      const raw = err?.response?.data?.message || err?.message || 'Failed to submit request. Please try again.';
+      setError(Array.isArray(raw) ? raw.join('; ') : String(raw));
     } finally {
       setSubmitting(false);
     }
@@ -179,24 +213,33 @@ export default function AddRequestScreen() {
                     <option key={o} value={o}>{o}</option>
                   ))}
                 </select>
-              ) : f.type === 'select-jobfamily' ? (
-                <select value={form[f.key]} onChange={(e) => update(f.key, e.target.value)}>
-                  <option value="">Select {f.label}…</option>
-                  {jobFamilies.map((jf) => (
-                    <option key={jf.id} value={jf.id}>{jf.name}</option>
-                  ))}
-                </select>
-              ) : f.type === 'select-client' ? (
+              ) : f.type === 'combobox-client' ? (
                 <>
                   <input
                     list="client-options"
-                    value={form[f.key]}
-                    onChange={(e) => update(f.key, e.target.value)}
-                    placeholder="Select or type client…"
+                    value={form.clientName}
+                    placeholder={f.placeholder}
+                    autoComplete="off"
+                    onChange={(e) => update('clientName', e.target.value)}
                   />
                   <datalist id="client-options">
                     {clients.map((c) => (
                       <option key={c.id} value={c.name} />
+                    ))}
+                  </datalist>
+                </>
+              ) : f.type === 'combobox-jobfamily' ? (
+                <>
+                  <input
+                    list="jobfamily-options"
+                    value={form.jobFamilyName}
+                    placeholder={f.placeholder}
+                    autoComplete="off"
+                    onChange={(e) => update('jobFamilyName', e.target.value)}
+                  />
+                  <datalist id="jobfamily-options">
+                    {jobFamilies.map((jf) => (
+                      <option key={jf.id} value={jf.name} />
                     ))}
                   </datalist>
                 </>

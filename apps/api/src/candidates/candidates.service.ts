@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { IdSequenceService } from '../id-sequence/id-sequence.service';
 import { OffersService } from '../offers/offers.service';
+import { RequirementsService } from '../requirements/requirements.service';
 import {
   CreateCandidateDto,
   UpdateCandidateDto,
@@ -27,6 +28,7 @@ export class CandidatesService {
     private readonly audit: AuditService,
     private readonly ids: IdSequenceService,
     private readonly offers: OffersService,
+    private readonly requirements: RequirementsService,
   ) {}
 
   private isPublicId(id: string) {
@@ -72,6 +74,121 @@ export class CandidatesService {
       candidate: mapped,
       message,
     };
+  }
+
+  private async assertLookupCode(
+    lookupType: string,
+    value: string,
+    fieldLabel: string,
+  ): Promise<string> {
+    const code = value.trim().toUpperCase();
+    const found = await this.prisma.lookupValue.findFirst({
+      where: {
+        code,
+        isActive: true,
+        lookupType: { code: lookupType },
+      },
+    });
+    if (!found) {
+      throw new BadRequestException(
+        `Invalid ${fieldLabel} '${value}'. Use an active ${lookupType} lookup value.`,
+      );
+    }
+    return code;
+  }
+
+  private async assertStageCode(stageCode: string): Promise<string> {
+    return this.assertLookupCode('CANDIDATE_STAGE', stageCode, 'stageCode');
+  }
+
+  private static readonly INTERVIEW_ROUND_VALUES: {
+    code: string;
+    label: string;
+  }[] = [
+    { code: 'L1', label: 'L1' },
+    { code: 'L2', label: 'L2' },
+    { code: 'L3', label: 'L3' },
+    { code: 'L4', label: 'L4' },
+    { code: 'COMPLETED', label: 'Completed' },
+  ];
+
+  /** Map legacy numeric / free-text interview rounds onto L1–L4 / COMPLETED. */
+  private normalizeInterviewRound(raw: string): string {
+    const value = raw.trim().toUpperCase().replace(/\s+/g, ' ');
+    if (/^L[1-4]$/.test(value) || value === 'COMPLETED') return value;
+
+    const aliasMap: Record<string, string> = {
+      '1': 'L1',
+      R1: 'L1',
+      'ROUND 1': 'L1',
+      ROUND1: 'L1',
+      '2': 'L2',
+      R2: 'L2',
+      'ROUND 2': 'L2',
+      ROUND2: 'L2',
+      '3': 'L3',
+      R3: 'L3',
+      'ROUND 3': 'L3',
+      ROUND3: 'L3',
+      '4': 'L4',
+      R4: 'L4',
+      'ROUND 4': 'L4',
+      ROUND4: 'L4',
+      FINAL: 'L4',
+      COMPLETED: 'COMPLETED',
+      COMPLETE: 'COMPLETED',
+      DONE: 'COMPLETED',
+    };
+    return aliasMap[value] ?? value;
+  }
+
+  private async ensureInterviewRoundLookups(): Promise<void> {
+    const activeCount = await this.prisma.lookupValue.count({
+      where: {
+        isActive: true,
+        lookupType: { code: 'INTERVIEW_ROUND' },
+      },
+    });
+    if (activeCount > 0) return;
+
+    const type = await this.prisma.lookupType.upsert({
+      where: { code: 'INTERVIEW_ROUND' },
+      create: { code: 'INTERVIEW_ROUND', label: 'INTERVIEW ROUND' },
+      update: {},
+    });
+
+    for (let i = 0; i < CandidatesService.INTERVIEW_ROUND_VALUES.length; i++) {
+      const v = CandidatesService.INTERVIEW_ROUND_VALUES[i];
+      await this.prisma.lookupValue.upsert({
+        where: {
+          lookupTypeId_code: { lookupTypeId: type.id, code: v.code },
+        },
+        create: {
+          lookupTypeId: type.id,
+          code: v.code,
+          label: v.label,
+          sortOrder: i + 1,
+          isActive: true,
+        },
+        update: { label: v.label, sortOrder: i + 1, isActive: true },
+      });
+    }
+  }
+
+  private async assertInterviewRound(
+    interviewRound: string | null | undefined,
+  ): Promise<string | null | undefined> {
+    if (interviewRound === undefined) return undefined;
+    if (interviewRound === null || String(interviewRound).trim() === '') {
+      return null;
+    }
+    const normalized = this.normalizeInterviewRound(String(interviewRound));
+    await this.ensureInterviewRoundLookups();
+    return this.assertLookupCode(
+      'INTERVIEW_ROUND',
+      normalized,
+      'interviewRound',
+    );
   }
 
   /**
@@ -218,6 +335,9 @@ export class CandidatesService {
   }
 
   async create(dto: CreateCandidateDto, actorId: string): Promise<any> {
+    // Heal wrongly CLOSED requirements that still have open seats (JOINED < positions).
+    await this.requirements.syncFillStatus(dto.requirementId, actorId);
+
     const req = await this.prisma.requirement.findFirst({
       where: { id: dto.requirementId, deletedAt: null },
     });
@@ -233,6 +353,8 @@ export class CandidatesService {
     const flags = await this.duplicateFlags(mobileNormalized, emailNormalized);
     const publicId = await this.ids.next('candidate', 'CAN');
     const statusFields = this.resolveStatusFields(dto, false);
+    const stageCode = await this.assertStageCode(dto.stageCode);
+    const interviewRound = await this.assertInterviewRound(dto.interviewRound);
 
     const row = await this.prisma.candidate.create({
       data: {
@@ -246,7 +368,7 @@ export class CandidatesService {
         source: dto.source,
         position: dto.position,
         jobFamily: dto.jobFamily,
-        stageCode: dto.stageCode,
+        stageCode,
         feedbackCode: statusFields.feedbackCode ?? dto.feedbackCode,
         selected: statusFields.selected ?? false,
         selectedAt: statusFields.selectedAt ?? null,
@@ -259,7 +381,7 @@ export class CandidatesService {
             : dto.clientShortlistDate
               ? new Date(dto.clientShortlistDate)
               : null,
-        interviewRound: dto.interviewRound,
+        interviewRound,
         remarks: dto.remarks,
       },
       include: {
@@ -316,6 +438,14 @@ export class CandidatesService {
       : before.emailNormalized;
 
     const statusFields = this.resolveStatusFields(dto, Boolean(before.offer));
+    const stageCode =
+      dto.stageCode !== undefined
+        ? await this.assertStageCode(dto.stageCode)
+        : undefined;
+    const interviewRound =
+      dto.interviewRound !== undefined
+        ? await this.assertInterviewRound(dto.interviewRound)
+        : undefined;
 
     const row = await this.prisma.candidate.update({
       where: { id: before.id },
@@ -328,7 +458,7 @@ export class CandidatesService {
         source: dto.source,
         position: dto.position,
         jobFamily: dto.jobFamily,
-        stageCode: dto.stageCode,
+        stageCode,
         feedbackCode:
           statusFields.feedbackCode !== undefined
             ? statusFields.feedbackCode
@@ -351,7 +481,7 @@ export class CandidatesService {
             : dto.clientShortlistDate
               ? new Date(dto.clientShortlistDate)
               : null,
-        interviewRound: dto.interviewRound,
+        interviewRound,
         remarks: dto.remarks,
       },
       include: {

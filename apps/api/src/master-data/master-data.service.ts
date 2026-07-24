@@ -113,7 +113,7 @@ export class MasterDataService {
     const existing = await this.prisma.client.findFirst({
       where: { nameNormalized, deletedAt: null },
     });
-    if (existing) throw new ConflictException('Client already exists');
+    if (existing) return existing;
     const client = await this.prisma.client.create({
       data: { name: dto.name.trim(), nameNormalized },
     });
@@ -162,9 +162,9 @@ export class MasterDataService {
   async createJobFamily(dto: CreateJobFamilyDto, actorId: string) {
     const name = dto.name.trim();
     const existing = await this.prisma.jobFamily.findFirst({
-      where: { name, deletedAt: null },
+      where: { name: { equals: name, mode: 'insensitive' }, deletedAt: null },
     });
-    if (existing) throw new ConflictException('Job family already exists');
+    if (existing) return existing;
     const row = await this.prisma.jobFamily.create({ data: { name } });
     await this.audit.log({
       entityType: 'JobFamily',

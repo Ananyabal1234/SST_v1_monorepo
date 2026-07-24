@@ -402,6 +402,15 @@ body {
 }
 .task-card:hover { border-color: var(--brand); }
 .task-card.active { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-tint); background: var(--card-grad); }
+.task-card--completed {
+  background: color-mix(in srgb, #6FFF6F 22%, var(--surface));
+  border-color: color-mix(in srgb, #6FFF6F 55%, var(--border));
+}
+.task-card--completed.active {
+  background: color-mix(in srgb, #6FFF6F 30%, var(--surface));
+  border-color: color-mix(in srgb, #6FFF6F 70%, var(--border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, #6FFF6F 40%, transparent);
+}
 .task-card-top { display: flex; align-items: center; gap: 8px; }
 .task-card-top svg { color: var(--brand); }
 .task-client { font-weight: 700; font-size: 14px; color: var(--text); flex: 1; }
@@ -496,6 +505,15 @@ body {
 .my-tasks h3 { margin: 0 0 12px; font-size: 16px; color: var(--text); }
 .my-tasks-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
 .my-task-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.my-task-card--completed {
+  background: color-mix(in srgb, var(--rag-green-fg, #16a34a) 10%, var(--surface));
+  border-color: color-mix(in srgb, var(--rag-green-fg, #16a34a) 35%, var(--border));
+}
+.mt-completed-badge {
+  color: var(--rag-green-fg, #16a34a);
+  font-size: 12px;
+  font-weight: 600;
+}
 .mt-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .mt-title { font-weight: 800; color: var(--text); }
 .mt-client { font-size: 13px; color: var(--text-soft); }

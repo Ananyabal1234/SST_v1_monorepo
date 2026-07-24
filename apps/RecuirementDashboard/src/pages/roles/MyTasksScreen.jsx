@@ -4,6 +4,16 @@ import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconBriefcase } from '../../components/Icons';
 
+function normalizeCandidate(c, reqPublicId) {
+  const publicId = c.publicId || c.candidateId || null;
+  return {
+    ...c,
+    candidateId: publicId,
+    publicId,
+    reqId: c.requirement?.publicId || reqPublicId || c.reqId || null,
+  };
+}
+
 export default function MyTasksScreen() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -22,17 +32,26 @@ export default function MyTasksScreen() {
         const candList = Array.isArray(candRes) ? candRes : candRes?.items || candRes?.data || [];
         const email = user?.email?.toLowerCase?.();
         const salesOnly = (r) => r.salesOwner?.email?.toLowerCase?.() === email;
-        const owned = reqList.filter(salesOnly).map((r) => ({
-          id: r.id,
-          publicId: r.publicId,
-          clientName: r.client?.name || '—',
-          roleSkill: r.roleSkill || '—',
-        }));
+        const owned = reqList.filter(salesOnly).map((r) => {
+          const numberOfPositions = Number(r.numberOfPositions) || 0;
+          const closedPositions = Number(r.closedPositions) || 0;
+          return {
+            id: r.id,
+            publicId: r.publicId,
+            clientName: r.client?.name || '—',
+            roleSkill: r.roleSkill || '—',
+            numberOfPositions,
+            closedPositions,
+            isCompleted: numberOfPositions > 0 && closedPositions >= numberOfPositions,
+          };
+        });
         setTasks(owned);
         // prepare a candidate map keyed by requirement id so we can show counts quickly
         const map = {};
         owned.forEach((r) => {
-          map[r.id] = candList.filter((c) => c.requirementId === r.id || c.requirement?.id === r.id);
+          map[r.id] = candList
+            .filter((c) => c.requirementId === r.id || c.requirement?.id === r.id)
+            .map((c) => normalizeCandidate(c, r.publicId));
         });
         setCandidatesMap(map);
       })
@@ -52,7 +71,9 @@ export default function MyTasksScreen() {
     try {
       const res = await get(ENDPOINTS.CANDIDATES);
       const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-      const filtered = list.filter((c) => c.requirementId === id || c.requirement?.id === id);
+      const filtered = list
+        .filter((c) => c.requirementId === id || c.requirement?.id === id)
+        .map((c) => normalizeCandidate(c, req.publicId));
       setCandidatesMap((m) => ({ ...m, [id]: filtered }));
     } catch (err) {
       setCandidatesMap((m) => ({ ...m, [id]: [] }));
@@ -78,13 +99,23 @@ export default function MyTasksScreen() {
       <div className="my-tasks-grid">
         {tasks.length === 0 && <div className="cand-empty">Not found</div>}
         {tasks.map((t) => (
-          <div key={t.id} className="my-task-card">
+          <div
+            key={t.id}
+            className={`my-task-card${t.isCompleted ? ' my-task-card--completed' : ''}`}
+          >
             <div className="mt-head">
-              <div className="mt-title">{t.publicId || t.id}</div>
+              <div className="mt-title">{t.publicId || '—'}</div>
               <div className="mt-client">{t.clientName}</div>
             </div>
             <div className="mt-meta">
-              <div>{t.roleSkill}</div>
+              <div>
+                {t.roleSkill}
+                {t.isCompleted && (
+                  <span className="mt-completed-badge">
+                    {' '}· Completed ({t.closedPositions}/{t.numberOfPositions})
+                  </span>
+                )}
+              </div>
               <button className="cand-edit" onClick={() => toggleCandidates(t)}>
                 {loadingMap[t.id] ? 'Loading…' : (candidatesMap[t.id] ? 'Hide' : `Candidates (${(candidatesMap[t.id]||[]).length})`)}
               </button>
@@ -134,15 +165,13 @@ export default function MyTasksScreen() {
         <div className="modal-overlay" onClick={closeCandidateDetails}>
           <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h3>Candidate Details — {viewingCandidate.candidateId || viewingCandidate.publicId || viewingCandidate.id}</h3>
+              <h3>Candidate Details — {viewingCandidate.publicId || viewingCandidate.candidateId || '—'}</h3>
               <button className="modal-close" onClick={closeCandidateDetails} title="Close">×</button>
             </div>
             <div className="modal-body">
               <div className="detail-grid">
-                <div className="detail-field"><span className="detail-label">Candidate ID</span><input value={viewingCandidate.candidateId || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Public ID</span><input value={viewingCandidate.publicId || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Internal ID</span><input value={viewingCandidate.id || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Req ID</span><input value={viewingCandidate.requirementId || viewingCandidate.reqId || ''} readOnly /></div>
+                <div className="detail-field"><span className="detail-label">Candidate ID</span><input value={viewingCandidate.publicId || viewingCandidate.candidateId || ''} readOnly /></div>
+                <div className="detail-field"><span className="detail-label">Req ID</span><input value={viewingCandidate.reqId || ''} readOnly /></div>
                 <div className="detail-field"><span className="detail-label">Candidate Name</span><input value={viewingCandidate.name || viewingCandidate.candidateName || ''} readOnly /></div>
                 <div className="detail-field"><span className="detail-label">Email</span><input value={viewingCandidate.email || ''} readOnly /></div>
                 <div className="detail-field"><span className="detail-label">Mobile</span><input value={viewingCandidate.mobile || ''} readOnly /></div>

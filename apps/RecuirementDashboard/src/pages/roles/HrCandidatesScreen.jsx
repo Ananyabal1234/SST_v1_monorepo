@@ -216,7 +216,13 @@ export default function HrCandidatesScreen() {
         remarks: form.remarks || '',
       };
       const res = await patch(`${ENDPOINTS.ONBOARDINGS}/${editingId}`, payload);
-      setSuccess(res?.message || 'Onboarding updated successfully');
+      const offerLeftAccepted =
+        String(form.offerStatus || '').toUpperCase() !== 'ACCEPTED';
+      setSuccess(
+        offerLeftAccepted
+          ? (res?.message || 'Offer updated — candidate returned to Offers')
+          : (res?.message || 'Onboarding updated successfully'),
+      );
       setModalOpen(false);
       await loadOnboardings();
     } catch (err) {

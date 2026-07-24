@@ -65,6 +65,7 @@ const KPI_DISPLAY_LABELS = [
   'totalRequirements',
   'totalPositions',
   'openPositions',
+  'closedPositions',
   'candidatesInPipeline',
   'selectedCandidates',
   'offersReleased',
@@ -79,6 +80,7 @@ const KPI_LIST_MAP = {
   totalRequirements: 'requirements',
   totalPositions: 'requirements',
   openPositions: 'requirements',
+  closedPositions: 'closedPositions',
   candidatesInPipeline: 'candidatesInPipeline',
   selectedCandidates: 'selectedCandidates',
   offersReleased: 'offersReleased',
@@ -95,6 +97,7 @@ const KPI_LABELS = {
   totalRequirements: 'Total Requirements',
   totalPositions: 'Total Positions',
   openPositions: 'Open Positions',
+  closedPositions: 'Closed Positions',
   candidatesInPipeline: 'Candidates in Pipeline',
   selectedCandidates: 'Selected Candidates',
   offersReleased: 'Offers Released',
@@ -157,6 +160,7 @@ function attachKpiPercentages(kpis) {
     totalRequirements: null,
     totalPositions: null,
     openPositions: values.totalPositions > 0 ? ((values.totalPositions - values.openPositions) / values.totalPositions) * 100 : 0,
+    closedPositions: values.totalPositions > 0 ? (values.closedPositions / values.totalPositions) * 100 : 0,
     candidatesInPipeline: values.openPositions > 0 ? (values.candidatesInPipeline / values.openPositions) * 100 : 0,
     selectedCandidates: values.candidatesInPipeline > 0 ? (values.selectedCandidates / values.candidatesInPipeline) * 100 : 0,
     offersReleased: values.selectedCandidates > 0 ? (values.offersReleased / values.selectedCandidates) * 100 : 0,
@@ -488,9 +492,24 @@ function KpiModal({ kpi, onClose }) {
     .replace(/_/g, ' ')
     .replace(/\w/g, (m) => m.toUpperCase());
 
+  const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const HIDDEN_KEYS = new Set([
+    'id',
+    'requirementId',
+    'candidateId',
+    'offerId',
+    'clientId',
+    'jobFamilyId',
+    'salesOwnerId',
+    'taOwnerId',
+    'hrOwnerId',
+    'mobileNormalized',
+    'emailNormalized',
+  ]);
+
   const columns = listKey
     ? Array.from(new Set(sortedItems.flatMap((row) => Object.keys(row))))
-      .filter((key) => key !== 'id' && key !== 'publicId')
+      .filter((key) => !HIDDEN_KEYS.has(key))
       .map((key) => ({ key, label: formatHeader(key) }))
     : DASHBOARD_COLUMNS.filter((c) => [
       'taOwner', 'salesOwner', 'priority', 'client', 'jobFamily',
@@ -503,11 +522,12 @@ function KpiModal({ kpi, onClose }) {
   const formatCell = (value) => {
     if (value == null) return '—';
     if (typeof value === 'object') {
+      if ('publicId' in value && value.publicId) return value.publicId;
       if ('name' in value) return value.name;
       if ('fullName' in value) return value.fullName;
-      if ('publicId' in value) return value.publicId;
       return JSON.stringify(value);
     }
+    if (typeof value === 'string' && UUID_LIKE.test(value)) return '—';
     return value;
   };
 
