@@ -21,15 +21,15 @@ export class AuthTokensUserDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ example: 'admin@sst.local' })
+  @ApiProperty({ description: 'User email' })
   email!: string;
 
-  @ApiProperty({ example: 'SST Admin' })
+  @ApiProperty({ description: 'Display name' })
   fullName!: string;
 
   @ApiProperty({
     example: 'ADMIN',
-    enum: ['ADMIN', 'SALES', 'TA', 'HR', 'LEADERSHIP_READONLY'],
+    enum: ['ADMIN', 'SALES', 'TA', 'HR'],
   })
   role!: string;
 }

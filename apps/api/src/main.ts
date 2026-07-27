@@ -35,7 +35,7 @@ async function bootstrap() {
         'Refresh tokens are returned in the body and as the httpOnly cookie `sst_refresh`.',
         '',
         '## Roles',
-        '`ADMIN`, `SALES`, `TA`, `HR`, `LEADERSHIP_READONLY`',
+        '`ADMIN`, `SALES`, `TA`, `HR`',
         '',
         '## Errors',
         'Errors use `{ statusCode, error, message, correlationId? }`.',

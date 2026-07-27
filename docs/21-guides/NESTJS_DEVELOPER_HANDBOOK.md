@@ -123,12 +123,12 @@ Copy `.env.example` to `.env` and update secrets if needed. Key vars:
 
 Prisma migrations live under `apps/api/prisma/migrations`. Seeding is `apps/api/prisma/seed.ts`.
 
-Seed creates (defaults shown in code):
+Seed creates a single **ADMIN** user from env (required — no hardcoded defaults):
 
-- `admin@sst.local` (ADMIN)
-- `sales@sst.local` (SALES)
-- `ta@sst.local` (TA)
-- `hr@sst.local` (HR)
+- `SEED_ADMIN_EMAIL`
+- `SEED_ADMIN_PASSWORD`
+
+Create Sales / TA / HR users via the Admin UI or API after seed.
 
 ### 2.5 Run API and web
 
@@ -160,14 +160,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-Login credentials (seed defaults):
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | `admin@sst.local` | `ChangeMeNow!` |
-| Sales | `sales@sst.local` | `ChangeMeNow!` |
-| TA | `ta@sst.local` | `ChangeMeNow!` |
-| HR | `hr@sst.local` | `ChangeMeNow!` |
+Login: use the admin email/password you set in `.env` (`SEED_ADMIN_*`). Additional role accounts are created manually after seed.
 
 ### 2.7 Troubleshooting (common first-day issues)
 
@@ -1088,8 +1081,8 @@ From `.env.example`:
 | `PORT` | `3000` | API listen port |
 | `CORS_ORIGIN` | `http://localhost:5173` | Allowed web origin |
 | `LOG_LEVEL` | `info` | Logging verbosity |
-| `SEED_ADMIN_EMAIL` | `admin@sst.local` | Seed admin user |
-| `SEED_ADMIN_PASSWORD` | `ChangeMeNow!` | Seed password |
+| `SEED_ADMIN_EMAIL` | _(required)_ | Seed admin user email |
+| `SEED_ADMIN_PASSWORD` | _(required)_ | Seed admin password |
 | `VITE_API_BASE_URL` | `/api/v1` | Frontend API base path |
 
 ### C) Glossary (quick)

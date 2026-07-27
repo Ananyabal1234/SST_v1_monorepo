@@ -24,9 +24,7 @@ Postgres is published on **host port 5433** (avoids clashes with other local Pos
 | API health | http://localhost:3000/health |
 | Swagger | http://localhost:3000/api/docs |
 
-Seed login: `admin@sst.local` / `ChangeMeNow!`
-
-Also seeded: `sales@sst.local`, `ta@sst.local`, `hr@sst.local` (same password).
+Admin login is created by `pnpm db:seed` using `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` from your `.env` (set these yourself; no default credentials are shipped).
 
 ## Design tokens
 

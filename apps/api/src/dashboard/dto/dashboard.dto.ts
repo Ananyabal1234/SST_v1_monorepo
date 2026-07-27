@@ -206,7 +206,7 @@ export class DashboardClientOpenPositionsDto {
   @ApiProperty({ format: 'uuid' })
   clientId!: string;
 
-  @ApiProperty({ example: 'Acme Corp' })
+  @ApiProperty({ description: 'Client name' })
   client!: string;
 
   @ApiProperty({ example: 4 })
@@ -217,7 +217,7 @@ export class DashboardClientClosedPositionsDto {
   @ApiProperty({ format: 'uuid' })
   clientId!: string;
 
-  @ApiProperty({ example: 'Acme Corp' })
+  @ApiProperty({ description: 'Client name' })
   client!: string;
 
   @ApiProperty({ example: 2 })

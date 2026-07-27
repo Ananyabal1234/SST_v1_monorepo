@@ -42,7 +42,6 @@ export class UsersController {
     Role.SALES,
     Role.TA,
     Role.HR,
-    Role.LEADERSHIP_READONLY,
   )
   @Get('directory')
   @ApiOperation({
@@ -82,11 +81,19 @@ export class UsersController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('role') role?: Role,
+    @Query('isActive') isActive?: string,
+    @Query('q') q?: string,
   ): Promise<any> {
+    let activeFilter: boolean | undefined;
+    if (isActive === 'true') activeFilter = true;
+    else if (isActive === 'false') activeFilter = false;
+
     return this.users.list(
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 50,
       role,
+      activeFilter,
+      q,
     );
   }
 

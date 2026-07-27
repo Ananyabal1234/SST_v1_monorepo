@@ -2,40 +2,30 @@ import { useEffect, useState } from 'react';
 import { get } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconBriefcase } from '../../components/Icons';
-
-function normalizeCandidate(c, reqPublicId) {
-  const publicId = c.publicId || c.candidateId || null;
-  return {
-    ...c,
-    candidateId: publicId,
-    publicId,
-    reqId: c.requirement?.publicId || reqPublicId || c.reqId || null,
-  };
-}
+import { IconBriefcase, IconClipboardCheck } from '../../components/Icons';
+import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 
 export default function MyTasksScreen() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [candidatesMap, setCandidatesMap] = useState({});
-  const [loadingMap, setLoadingMap] = useState({});
+  const [pipelineReq, setPipelineReq] = useState(null);
   const [viewingCandidate, setViewingCandidate] = useState(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    Promise.all([get(ENDPOINTS.REQUIREMENTS), get(ENDPOINTS.CANDIDATES)])
-      .then(([reqRes, candRes]) => {
+    get(ENDPOINTS.REQUIREMENTS)
+      .then((reqRes) => {
         if (!active) return;
         const reqList = Array.isArray(reqRes) ? reqRes : reqRes?.items || reqRes?.data || [];
-        const candList = Array.isArray(candRes) ? candRes : candRes?.items || candRes?.data || [];
         const email = user?.email?.toLowerCase?.();
         const salesOnly = (r) => r.salesOwner?.email?.toLowerCase?.() === email;
         const owned = reqList.filter(salesOnly).map((r) => {
           const numberOfPositions = Number(r.numberOfPositions) || 0;
           const closedPositions = Number(r.closedPositions) || 0;
           return {
+            ...r,
             id: r.id,
             publicId: r.publicId,
             clientName: r.client?.name || '—',
@@ -46,44 +36,11 @@ export default function MyTasksScreen() {
           };
         });
         setTasks(owned);
-        // prepare a candidate map keyed by requirement id so we can show counts quickly
-        const map = {};
-        owned.forEach((r) => {
-          map[r.id] = candList
-            .filter((c) => c.requirementId === r.id || c.requirement?.id === r.id)
-            .map((c) => normalizeCandidate(c, r.publicId));
-        });
-        setCandidatesMap(map);
       })
       .catch(() => active && setTasks([]))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [user]);
-
-  const toggleCandidates = async (req) => {
-    const id = req.id;
-    if (candidatesMap[id]) {
-      // collapse
-      setCandidatesMap((m) => { const copy = { ...m }; delete copy[id]; return copy; });
-      return;
-    }
-    setLoadingMap((m) => ({ ...m, [id]: true }));
-    try {
-      const res = await get(ENDPOINTS.CANDIDATES);
-      const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-      const filtered = list
-        .filter((c) => c.requirementId === id || c.requirement?.id === id)
-        .map((c) => normalizeCandidate(c, req.publicId));
-      setCandidatesMap((m) => ({ ...m, [id]: filtered }));
-    } catch (err) {
-      setCandidatesMap((m) => ({ ...m, [id]: [] }));
-    } finally {
-      setLoadingMap((m) => ({ ...m, [id]: false }));
-    }
-  };
-
-  const openCandidateDetails = (candidate) => setViewingCandidate(candidate);
-  const closeCandidateDetails = () => setViewingCandidate(null);
 
   if (loading) return <div className="screen-loading"><div className="spinner" /></div>;
 
@@ -93,7 +50,7 @@ export default function MyTasksScreen() {
         <span className="assign-badge"><IconBriefcase /></span>
         <div>
           <h2 className="assign-title">Task History</h2>
-          <p className="assign-sub">Requirements assigned to you (sales owner).</p>
+          <p className="assign-sub">Your requirements — open the candidate pipeline to track recruiting progress (view only).</p>
         </div>
       </div>
       <div className="my-tasks-grid">
@@ -116,76 +73,55 @@ export default function MyTasksScreen() {
                   </span>
                 )}
               </div>
-              <button className="cand-edit" onClick={() => toggleCandidates(t)}>
-                {loadingMap[t.id] ? 'Loading…' : (candidatesMap[t.id] ? 'Hide' : `Candidates (${(candidatesMap[t.id]||[]).length})`)}
+              <button className="cand-edit" type="button" onClick={() => setPipelineReq(t)}>
+                <IconClipboardCheck /> View pipeline
               </button>
             </div>
-            {candidatesMap[t.id] && (
-              <div className="mt-candidate-table-wrap">
-                <table className="mt-candidate-table">
-                  <thead>
-                    <tr>
-                      <th>Candidate</th>
-                      <th>Email</th>
-                      <th>Mobile</th>
-                      <th>Stage</th>
-                      <th>Status</th>
-                      <th>Profile Submitted</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {candidatesMap[t.id].length === 0 && (
-                      <tr><td colSpan={7} className="cand-empty">No candidates found.</td></tr>
-                    )}
-                    {candidatesMap[t.id].map((c) => (
-                      <tr key={c.publicId || c.id}>
-                        <td>{c.name || c.candidateName || c.email}</td>
-                        <td>{c.email || '—'}</td>
-                        <td>{c.mobile || '—'}</td>
-                        <td>{c.stageCode || c.candidateStage || '—'}</td>
-                        <td>{c.candidateStatus || c.feedbackStatus || '—'}</td>
-                        <td>{(c.profileSubmittedDate || '').slice(0, 10) || '—'}</td>
-                        <td>
-                          <button className="cand-edit" type="button" onClick={() => openCandidateDetails(c)}>
-                            Details
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
           </div>
         ))}
       </div>
 
-      {viewingCandidate && (
-        <div className="modal-overlay" onClick={closeCandidateDetails}>
-          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+      {pipelineReq && (
+        <div className="modal-overlay" onClick={() => { setPipelineReq(null); setViewingCandidate(null); }}>
+          <div className="modal-card detail-modal pipeline-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h3>Candidate Details — {viewingCandidate.publicId || viewingCandidate.candidateId || '—'}</h3>
-              <button className="modal-close" onClick={closeCandidateDetails} title="Close">×</button>
+              <h3>Candidate pipeline — {pipelineReq.publicId || pipelineReq.id}</h3>
+              <button className="modal-close" onClick={() => { setPipelineReq(null); setViewingCandidate(null); }} title="Close">×</button>
             </div>
             <div className="modal-body">
-              <div className="detail-grid">
-                <div className="detail-field"><span className="detail-label">Candidate ID</span><input value={viewingCandidate.publicId || viewingCandidate.candidateId || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Req ID</span><input value={viewingCandidate.reqId || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Candidate Name</span><input value={viewingCandidate.name || viewingCandidate.candidateName || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Email</span><input value={viewingCandidate.email || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Mobile</span><input value={viewingCandidate.mobile || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Source</span><input value={viewingCandidate.source || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Candidate Stage</span><input value={viewingCandidate.stageCode || viewingCandidate.candidateStage || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Candidate Status</span><input value={viewingCandidate.candidateStatus || viewingCandidate.feedbackStatus || ''} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Profile Submitted</span><input value={(viewingCandidate.profileSubmittedDate || '').slice(0, 10)} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Client Shortlist Date</span><input value={(viewingCandidate.clientShortlistDate || '').slice(0, 10)} readOnly /></div>
-                <div className="detail-field"><span className="detail-label">Interview Round</span><input value={viewingCandidate.interviewRound || ''} readOnly /></div>
-                <div className="detail-field full"><span className="detail-label">Remarks</span><textarea value={viewingCandidate.remarks || ''} readOnly /></div>
+              <RequirementPipelineBoard
+                requirementId={pipelineReq.id}
+                requirement={pipelineReq}
+                mode="readonly"
+                onViewCandidate={(c) => setViewingCandidate(c)}
+              />
+            </div>
+            <div className="modal-foot">
+              <button type="button" className="filter-clear" onClick={() => { setPipelineReq(null); setViewingCandidate(null); }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewingCandidate && (
+        <div className="modal-overlay" onClick={() => setViewingCandidate(null)}>
+          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Candidate — {viewingCandidate.publicId || viewingCandidate.name}</h3>
+              <button className="modal-close" onClick={() => setViewingCandidate(null)} title="Close">×</button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-grid detail-grid-2">
+                <div className="detail-item"><span className="detail-label">Name</span><span className="detail-value">{viewingCandidate.name || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Email</span><span className="detail-value">{viewingCandidate.email || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Mobile</span><span className="detail-value">{viewingCandidate.mobile || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Stage</span><span className="detail-value">{viewingCandidate.pipelineLabel || viewingCandidate.stageCode || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Offer</span><span className="detail-value">{viewingCandidate.offer?.statusCode || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Onboarding</span><span className="detail-value">{viewingCandidate.onboarding?.statusCode || '—'}</span></div>
               </div>
             </div>
             <div className="modal-foot">
-              <button type="button" className="filter-clear" onClick={closeCandidateDetails}>Close</button>
+              <button type="button" className="filter-clear" onClick={() => setViewingCandidate(null)}>Close</button>
             </div>
           </div>
         </div>

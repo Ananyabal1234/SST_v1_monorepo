@@ -242,7 +242,6 @@ enum Role {
   SALES
   TA
   HR
-  LEADERSHIP_READONLY
 }
 
 enum RequirementStatus {

@@ -65,10 +65,14 @@ const LOOKUPS: Record<string, { code: string; label: string }[]> = {
 };
 
 async function main() {
-  const adminEmail = (
-    process.env.SEED_ADMIN_EMAIL ?? 'admin@sst.local'
-  ).toLowerCase();
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'ChangeMeNow!';
+  const adminEmailRaw = process.env.SEED_ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminEmailRaw || !adminPassword) {
+    throw new Error(
+      'SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set in the environment before seeding',
+    );
+  }
+  const adminEmail = adminEmailRaw.toLowerCase();
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);
 
@@ -177,18 +181,6 @@ async function main() {
       data: { interviewRound: mapped ? mapped.code : null },
     });
   }
-
-  await prisma.client.upsert({
-    where: { nameNormalized: 'acme corp' },
-    create: { name: 'Acme Corp', nameNormalized: 'acme corp' },
-    update: {},
-  });
-
-  await prisma.jobFamily.upsert({
-    where: { name: 'Engineering' },
-    create: { name: 'Engineering' },
-    update: {},
-  });
 
   await prisma.idSequence.upsert({
     where: { name: 'requirement' },

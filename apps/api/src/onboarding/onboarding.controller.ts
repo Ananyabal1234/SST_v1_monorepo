@@ -36,7 +36,7 @@ import { OnboardingsQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Onboardings')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.HR, Role.LEADERSHIP_READONLY)
+@Roles(Role.ADMIN, Role.HR)
 @Controller('onboardings')
 export class OnboardingController {
   constructor(private readonly onboarding: OnboardingService) {}

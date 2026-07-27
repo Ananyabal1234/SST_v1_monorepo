@@ -17,10 +17,26 @@ export class UsersService {
     private readonly audit: AuditService,
   ) {}
 
-  async list(page = 1, pageSize = 20, role?: Role): Promise<any> {
+  async list(
+    page = 1,
+    pageSize = 20,
+    role?: Role,
+    isActive?: boolean,
+    q?: string,
+  ): Promise<any> {
+    const search = q?.trim();
     const where = {
       deletedAt: null,
       ...(role ? { role } : {}),
+      ...(typeof isActive === 'boolean' ? { isActive } : {}),
+      ...(search
+        ? {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' as const } },
+              { fullName: { contains: search, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.user.findMany({
@@ -86,11 +102,6 @@ export class UsersService {
           description: 'Creates credentials used as hrOwnerId on onboarding',
         },
         {
-          value: Role.LEADERSHIP_READONLY,
-          label: 'Leadership (read-only)',
-          description: 'Dashboard / reporting access',
-        },
-        {
           value: Role.ADMIN,
           label: 'Admin',
           description: 'Full system administration',
@@ -136,6 +147,9 @@ export class UsersService {
       where: { id, deletedAt: null },
     });
     if (!before) throw new NotFoundException('User not found');
+    if (id === actorId && dto.isActive === false) {
+      throw new BadRequestException('You cannot deactivate your own account');
+    }
     const user = await this.prisma.user.update({
       where: { id },
       data: {

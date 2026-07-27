@@ -20,6 +20,7 @@ import { Role } from '../prisma/client';
 import { CandidatesService } from './candidates.service';
 import {
   CreateCandidateDto,
+  DuplicateLookupQueryDto,
   SelectCandidateDto,
   UpdateCandidateDto,
 } from './dto/candidates.dto';
@@ -36,25 +37,44 @@ import { CandidatesQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Candidates')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR, Role.LEADERSHIP_READONLY)
+@Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
 @Controller('candidates')
 export class CandidatesController {
   constructor(private readonly candidates: CandidatesService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR, Role.LEADERSHIP_READONLY)
+  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
   @ApiOperation({
     operationId: 'listCandidates',
     summary: 'List candidates with filters',
   })
   @ApiOkResponse({ description: 'Paginated candidates' })
   @ApiProtectedErrors()
-  list(@Query() query: CandidatesQueryDto): Promise<any> {
-    return this.candidates.list(query as Record<string, string>);
+  list(
+    @Query() query: CandidatesQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
+    return this.candidates.list(query as Record<string, string>, user);
+  }
+
+  @Get('duplicates')
+  @Roles(Role.ADMIN, Role.TA)
+  @ApiOperation({
+    operationId: 'lookupDuplicateCandidates',
+    summary: 'Lookup prior candidate rows by email or mobile (TA/Admin)',
+  })
+  @ApiOkResponse({ description: 'Duplicate candidate history' })
+  @ApiProtectedErrors()
+  lookupDuplicates(@Query() query: DuplicateLookupQueryDto): Promise<any> {
+    return this.candidates.findDuplicateCandidates(
+      query.email,
+      query.mobile,
+      query.excludeId,
+    );
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR, Role.LEADERSHIP_READONLY)
+  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
   @ApiOperation({
     operationId: 'getCandidate',
     summary: 'Candidate detail including duplicate flags',

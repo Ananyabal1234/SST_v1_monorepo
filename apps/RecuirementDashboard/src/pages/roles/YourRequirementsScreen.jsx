@@ -3,6 +3,7 @@ import { get, put } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
+import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 
 // Shows the requirements from the live backend (GET /api/v1/requirements).
 // Sales users see only the requirements they own (salesOwnerId === user.id);
@@ -16,7 +17,8 @@ export default function YourRequirementsScreen() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ clientId: '', priorityCode: '', status: '' });
   const [editing, setEditing] = useState(null); // requirement being edited
-  const [viewingRequirement, setViewingRequirement] = useState(null); // requirement being viewed
+  const [viewingRequirement, setViewingRequirement] = useState(null); // requirement pipeline view
+  const [viewingCandidate, setViewingCandidate] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [editError, setEditError] = useState(null);
@@ -157,7 +159,7 @@ export default function YourRequirementsScreen() {
 
   const closeEdit = () => { setEditing(null); setForm({}); };
   const openRequirementDetails = (requirement) => { setViewingRequirement(requirement); };
-  const closeRequirementDetails = () => { setViewingRequirement(null); };
+  const closeRequirementDetails = () => { setViewingRequirement(null); setViewingCandidate(null); };
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -326,6 +328,14 @@ export default function YourRequirementsScreen() {
                   </td>
                   <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}</td>
                   <td>
+                    <button
+                      className="cand-edit"
+                      onClick={(e) => { e.stopPropagation(); openRequirementDetails(r); }}
+                      title="View pipeline"
+                    >
+                      <IconClipboardCheck /> Pipeline
+                    </button>
+                    {' '}
                     <button className="cand-edit" onClick={(e) => { e.stopPropagation(); openEdit(r); }} title="Edit">
                       <IconEdit /> Edit
                     </button>
@@ -341,51 +351,18 @@ export default function YourRequirementsScreen() {
 
       {viewingRequirement && (
         <div className="modal-overlay" onClick={closeRequirementDetails}>
-          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-card detail-modal pipeline-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h3>Requirement Details — {viewingRequirement.publicId || viewingRequirement.id}</h3>
+              <h3>Candidate pipeline — {viewingRequirement.publicId || viewingRequirement.id}</h3>
               <button className="modal-close" onClick={closeRequirementDetails} title="Close">×</button>
             </div>
             <div className="modal-body">
-              <div className="detail-panel">
-                <div className="detail-panel-head">
-                  <h4>Overview</h4>
-                </div>
-                <div className="detail-grid detail-grid-2">
-                  <div className="detail-item"><span className="detail-label">Req ID</span><span className="detail-value">{viewingRequirement.publicId || viewingRequirement.id || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Client</span><span className="detail-value">{viewingRequirement.client?.name || viewingRequirement.clientName || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Role / Skill</span><span className="detail-value">{viewingRequirement.roleSkill || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Job Family</span><span className="detail-value">{viewingRequirement.jobFamily?.name || viewingRequirement.jobFamilyId || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Positions</span><span className="detail-value">{viewingRequirement.numberOfPositions ?? '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Priority</span><span className="detail-value">{viewingRequirement.priorityCode || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Status</span><span className="detail-value">{viewingRequirement.status || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Job Location</span><span className="detail-value">{viewingRequirement.jobLocation || '—'}</span></div>
-                </div>
-              </div>
-              <div className="detail-panel">
-                <div className="detail-panel-head">
-                  <h4>Owners & dates</h4>
-                </div>
-                <div className="detail-grid detail-grid-2">
-                  <div className="detail-item"><span className="detail-label">Sales Owner</span><span className="detail-value">{viewingRequirement.salesOwner?.fullName || viewingRequirement.salesOwner?.name || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">TA Owner</span><span className="detail-value">{viewingRequirement.taOwner?.fullName || viewingRequirement.taOwner?.name || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Requirement Date</span><span className="detail-value">{(viewingRequirement.requirementDate || '').slice(0, 10) || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">TA Handoff Date</span><span className="detail-value">{(viewingRequirement.taHandoffDate || '').slice(0, 10) || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Target Closure Date</span><span className="detail-value">{(viewingRequirement.targetClosureDate || '').slice(0, 10) || '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Experience (Years)</span><span className="detail-value">{viewingRequirement.experience || '—'}</span></div>
-                </div>
-              </div>
-              <div className="detail-panel detail-panel-full">
-                <div className="detail-panel-head">
-                  <h4>Budget & description</h4>
-                </div>
-                <div className="detail-grid detail-grid-2">
-                  <div className="detail-item"><span className="detail-label">Min Budget</span><span className="detail-value">{viewingRequirement.minBudget ?? '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Max Budget</span><span className="detail-value">{viewingRequirement.maxBudget ?? '—'}</span></div>
-                  <div className="detail-item"><span className="detail-label">Duration (Months)</span><span className="detail-value">{viewingRequirement.durationMonths ?? '—'}</span></div>
-                </div>
-                <div className="detail-description">{viewingRequirement.remarks || 'No job description provided.'}</div>
-              </div>
+              <RequirementPipelineBoard
+                requirementId={viewingRequirement.id}
+                requirement={viewingRequirement}
+                mode="readonly"
+                onViewCandidate={(c) => setViewingCandidate(c)}
+              />
             </div>
             <div className="modal-foot">
               <button className="filter-clear" type="button" onClick={closeRequirementDetails}>Close</button>
@@ -393,6 +370,34 @@ export default function YourRequirementsScreen() {
           </div>
         </div>
       )}
+
+      {viewingCandidate && (
+        <div className="modal-overlay" onClick={() => setViewingCandidate(null)}>
+          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <h3>Candidate — {viewingCandidate.publicId || viewingCandidate.name}</h3>
+              <button className="modal-close" onClick={() => setViewingCandidate(null)} title="Close">×</button>
+            </div>
+            <div className="modal-body">
+              <div className="detail-grid detail-grid-2">
+                <div className="detail-item"><span className="detail-label">Name</span><span className="detail-value">{viewingCandidate.name || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Email</span><span className="detail-value">{viewingCandidate.email || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Mobile</span><span className="detail-value">{viewingCandidate.mobile || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Stage</span><span className="detail-value">{viewingCandidate.pipelineLabel || viewingCandidate.stageCode || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Status</span><span className="detail-value">{viewingCandidate.candidateStatus || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Interview</span><span className="detail-value">{viewingCandidate.interviewRound || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Offer</span><span className="detail-value">{viewingCandidate.offer?.statusCode || '—'}</span></div>
+                <div className="detail-item"><span className="detail-label">Onboarding</span><span className="detail-value">{viewingCandidate.onboarding?.statusCode || '—'}</span></div>
+              </div>
+              <div className="detail-description" style={{ marginTop: 12 }}>{viewingCandidate.remarks || 'No remarks.'}</div>
+            </div>
+            <div className="modal-foot">
+              <button className="filter-clear" type="button" onClick={() => setViewingCandidate(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {editing && (
         <div className="modal-overlay" onClick={closeEdit}>
           <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>

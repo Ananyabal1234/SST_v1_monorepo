@@ -39,14 +39,16 @@ export const ENDPOINTS = {
   TA_MEMBERS: '/api/v1/master-data/ta-members',       // GET -> [{ id, fullName, email, role }]
   CANDIDATE_STATUS: '/api/v1/master-data/candidate-status', // GET -> ["Selected","Rejected","Pending"]
   LOOKUPS: '/api/v1/master-data/lookups', // GET /api/v1/master-data/lookups/{type} -> lookup values (e.g. OFFER_STATUS)
-  USERS: '/api/v1/users',                            // GET list | POST create user
+  USERS: '/api/v1/users',                            // GET list | POST create | PATCH/DELETE /{id}
   USER_ROLES: '/api/v1/users/roles',                 // GET -> role select options
   REQUIREMENTS: '/api/v1/requirements',              // GET -> [{ id, salesOwnerId, taOwnerId, ... }]
   REQUIREMENT_BY_ID: '/api/v1/requirements',          // PUT /api/v1/requirements/{id} -> updated requirement
+  REQUIREMENT_PIPELINE: '/api/v1/requirements',       // GET /api/v1/requirements/{id}/pipeline
 
   // ---- Assign task (TA owner) ----
   TASKS: '/tasks',                      // GET  -> list of assigned tasks (prefilled by sales)
   CANDIDATES: '/api/v1/candidates',     // GET  -> list of candidates { items: [...] }
+  CANDIDATE_DUPLICATES: '/api/v1/candidates/duplicates', // GET -> prior rows by email/mobile
   ADD_CANDIDATE: '/api/v1/candidates',  // POST -> add a candidate { requirementId, name, mobile, email, source, stageCode, candidateStatus, profileSubmittedDate, remarks }
   UPDATE_CANDIDATE: '/api/v1/candidates', // PATCH /api/v1/candidates/{id} -> edit a candidate
 

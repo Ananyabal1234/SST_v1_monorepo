@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { get, post, patch } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
@@ -6,6 +6,8 @@ import {
   IconClipboardCheck, IconBriefcase, IconUser, IconTarget, IconFolderOpen,
   IconWallet, IconMapPin, IconClock, IconPlus, IconEdit,
 } from '../../components/Icons';
+import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import DuplicateCandidatePanel from '../../components/DuplicateCandidatePanel';
 
 const FALLBACK_STAGES = [
   { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
@@ -78,6 +80,57 @@ export default function AssignTaskScreen() {
   const [candidateStatuses, setCandidateStatuses] = useState([]);
   const [candidateStages, setCandidateStages] = useState(FALLBACK_STAGES);
   const [interviewRounds, setInterviewRounds] = useState(FALLBACK_ROUNDS);
+  const [pipelineRefreshKey, setPipelineRefreshKey] = useState(0);
+  const [viewMode, setViewMode] = useState('pipeline'); // pipeline | table
+  const [duplicateLookup, setDuplicateLookup] = useState({
+    loading: false,
+    data: null,
+    error: null,
+  });
+  const duplicateTimerRef = useRef(null);
+
+  const bumpPipeline = () => setPipelineRefreshKey((k) => k + 1);
+
+  const clearDuplicateLookup = useCallback(() => {
+    if (duplicateTimerRef.current) {
+      clearTimeout(duplicateTimerRef.current);
+      duplicateTimerRef.current = null;
+    }
+    setDuplicateLookup({ loading: false, data: null, error: null });
+  }, []);
+
+  const lookupDuplicates = useCallback((email, mobile, excludeId) => {
+    const emailVal = String(email || '').trim();
+    const mobileVal = String(mobile || '').trim();
+    if (!emailVal && !mobileVal) {
+      clearDuplicateLookup();
+      return;
+    }
+
+    if (duplicateTimerRef.current) clearTimeout(duplicateTimerRef.current);
+    duplicateTimerRef.current = setTimeout(async () => {
+      setDuplicateLookup({ loading: true, data: null, error: null });
+      try {
+        const params = new URLSearchParams();
+        if (emailVal) params.set('email', emailVal);
+        if (mobileVal) params.set('mobile', mobileVal);
+        if (excludeId) params.set('excludeId', excludeId);
+        const res = await get(`${ENDPOINTS.CANDIDATE_DUPLICATES}?${params.toString()}`);
+        setDuplicateLookup({ loading: false, data: res, error: null });
+      } catch (err) {
+        setDuplicateLookup({
+          loading: false,
+          data: null,
+          error: err?.response?.data?.message || err?.message || 'Failed to check duplicates',
+        });
+      }
+    }, 400);
+  }, [clearDuplicateLookup]);
+
+  const handleContactBlur = useCallback(() => {
+    const excludeId = editing || form.id || undefined;
+    lookupDuplicates(form.email, form.mobile, excludeId);
+  }, [editing, form.email, form.mobile, form.id, lookupDuplicates]);
 
   useEffect(() => {
     let active = true;
@@ -93,15 +146,11 @@ export default function AssignTaskScreen() {
         // Map the requirements API response into the task-card shape used below.
         const mapped = reqList
           .filter((r) => {
+            // TA / Admin recruit across all requirements; Sales (if ever here) only own.
+            if (user?.userType === 'ta_owner' || user?.userType === 'admin') return true;
             const currentEmail = user?.email?.toLowerCase?.();
-            const isSales = user?.userType === 'sales';
-            const isTa = user?.userType === 'ta_owner';
-            const matchEmail = isSales
-              ? r.salesOwner?.email?.toLowerCase?.()
-              : isTa
-                ? r.taOwner?.email?.toLowerCase?.()
-                : null;
-            return !currentEmail || !matchEmail || currentEmail === matchEmail;
+            const ownerEmail = r.salesOwner?.email?.toLowerCase?.();
+            return !currentEmail || !ownerEmail || currentEmail === ownerEmail;
           })
           .map((r) => {
             const numberOfPositions = Number(r.numberOfPositions) || 0;
@@ -176,6 +225,7 @@ export default function AssignTaskScreen() {
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null;
 
   const openAdd = (task) => {
+    clearDuplicateLookup();
     setEditing(null);
     setForm({
       ...EMPTY_CANDIDATE,
@@ -189,12 +239,52 @@ export default function AssignTaskScreen() {
   };
 
   const openEdit = (cand) => {
+    clearDuplicateLookup();
     setEditing(cand.id);
     setForm({ ...EMPTY_CANDIDATE, ...cand, id: cand.id, requirementId: cand.requirementId || cand.reqId });
     setError(null); setSuccess(null); setShowForm(true);
+    lookupDuplicates(cand.email, cand.mobile, cand.id);
   };
 
-  const closeForm = () => { setShowForm(false); setEditing(null); setForm(EMPTY_CANDIDATE); };
+  const openEditFromPipeline = (cand) => {
+    openEdit({
+      id: cand.id,
+      candidateId: cand.publicId || cand.id,
+      publicId: cand.publicId,
+      requirementId: cand.requirementId || selectedTaskId,
+      reqId: selectedTask?.publicId || selectedTaskId,
+      position: cand.position || selectedTask?.position || '',
+      jobFamily: cand.jobFamily || selectedTask?.jobFamily || '',
+      candidateName: cand.name || cand.candidateName || '',
+      email: cand.email || '',
+      mobile: cand.mobile || '',
+      source: cand.source || '',
+      candidateStage: cand.stageCode || cand.candidateStage || 'SUBMITTED_TO_SPOC',
+      feedbackStatus: cand.candidateStatus || cand.feedbackStatus || 'Pending',
+      profileSubmittedDate: (cand.profileSubmittedDate || '').toString().slice(0, 10),
+      clientShortlistDate: (cand.clientShortlistDate || '').toString().slice(0, 10),
+      interviewRound: cand.interviewRound || '',
+      remarks: cand.remarks || '',
+    });
+  };
+
+  const handleSelectFromPipeline = async (cand, selected = true) => {
+    try {
+      setError(null);
+      await post(`${ENDPOINTS.CANDIDATES}/${cand.id}/select`, { selected });
+      setSuccess(selected ? 'Candidate selected' : 'Candidate unselected');
+      bumpPipeline();
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.message || 'Failed to select candidate');
+    }
+  };
+
+  const closeForm = () => {
+    clearDuplicateLookup();
+    setShowForm(false);
+    setEditing(null);
+    setForm(EMPTY_CANDIDATE);
+  };
   const openCandidateDetails = (candidate) => setViewingCandidate(candidate);
   const closeCandidateDetails = () => setViewingCandidate(null);
 
@@ -302,6 +392,7 @@ export default function AssignTaskScreen() {
         ));
       }
       closeForm();
+      bumpPipeline();
     } catch (err) {
       setError(err?.message || 'Failed to save. Please try again.');
     }
@@ -363,11 +454,57 @@ export default function AssignTaskScreen() {
                   <h3 className="task-detail-title">{selectedTask.clientName} — {selectedTask.position}</h3>
                   <span className="task-detail-id">{selectedTask.publicId || selectedTask.id}</span>
                 </div>
-                <button className="add-cand-btn" onClick={() => openAdd(selectedTask)}>
-                  <IconPlus /> Add Candidate
-                </button>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="filter-clear"
+                    onClick={() => setViewMode((m) => (m === 'pipeline' ? 'table' : 'pipeline'))}
+                  >
+                    {viewMode === 'pipeline' ? 'Table view' : 'Pipeline view'}
+                  </button>
+                  <button className="add-cand-btn" onClick={() => openAdd(selectedTask)}>
+                    <IconPlus /> Add Candidate
+                  </button>
+                </div>
               </div>
 
+              {error && <div className="add-error">{Array.isArray(error) ? error.join(', ') : error}</div>}
+              {success && <div className="add-success">{success}</div>}
+
+              {viewMode === 'pipeline' ? (
+                <RequirementPipelineBoard
+                  requirementId={selectedTask.id}
+                  mode="edit"
+                  refreshKey={pipelineRefreshKey}
+                  requirement={{
+                    id: selectedTask.id,
+                    publicId: selectedTask.publicId,
+                    roleSkill: selectedTask.position,
+                    status: selectedTask.status,
+                    client: { name: selectedTask.clientName },
+                    taOwner: { fullName: selectedTask.taOwner },
+                    salesOwner: { fullName: selectedTask.salesOwner },
+                    numberOfPositions: selectedTask.noOfPositions,
+                    openPositions: undefined,
+                    closedPositions: selectedTask.closedPositions,
+                  }}
+                  onAddCandidate={() => openAdd(selectedTask)}
+                  onEditCandidate={openEditFromPipeline}
+                  onSelectCandidate={handleSelectFromPipeline}
+                  onViewCandidate={(c) => openCandidateDetails({
+                    ...c,
+                    candidateId: c.publicId || c.id,
+                    candidateName: c.name,
+                    candidateStage: c.stageCode,
+                    feedbackStatus: c.candidateStatus,
+                    reqId: selectedTask.publicId,
+                    position: selectedTask.position,
+                    jobFamily: selectedTask.jobFamily,
+                    profileSubmittedDate: (c.profileSubmittedDate || '').toString().slice(0, 10),
+                    clientShortlistDate: (c.clientShortlistDate || '').toString().slice(0, 10),
+                  })}
+                />
+              ) : (
               <div className="cand-table-wrap">
                 <table className="cand-table">
                   <thead>
@@ -405,6 +542,7 @@ export default function AssignTaskScreen() {
                   </tbody>
                 </table>
               </div>
+              )}
 
               {viewingCandidate && (
                 <div className="modal-overlay" onClick={closeCandidateDetails}>
@@ -473,12 +611,18 @@ export default function AssignTaskScreen() {
                             value={form[f.key]}
                             disabled={f.locked}
                             onChange={(e) => update(f.key, e.target.value)}
+                            onBlur={f.key === 'email' || f.key === 'mobile' ? handleContactBlur : undefined}
                           />
                         )}
                       </label>
                       );
                     })}
                   </div>
+                  <DuplicateCandidatePanel
+                    loading={duplicateLookup.loading}
+                    error={duplicateLookup.error}
+                    data={duplicateLookup.data}
+                  />
                   {error && <div className="add-error">{error}</div>}
                   {success && <div className="add-success">{success}</div>}
                   <div className="add-actions">

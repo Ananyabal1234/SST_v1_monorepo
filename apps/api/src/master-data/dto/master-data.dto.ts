@@ -72,16 +72,16 @@ export class UpdateLookupValueDto {
 
 /** Create TA / Sales / HR member (role is fixed by the route). */
 export class CreateMemberDto {
-  @ApiProperty({ example: 'ta.user@sst.local' })
+  @ApiProperty({ description: 'Member email' })
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ example: 'Taylor TA' })
+  @ApiProperty({ description: 'Display name' })
   @IsString()
   @MinLength(1)
   fullName!: string;
 
-  @ApiProperty({ example: 'ChangeMeNow!', minLength: 8 })
+  @ApiProperty({ description: 'Temporary password', minLength: 8 })
   @IsString()
   @MinLength(8)
   password!: string;

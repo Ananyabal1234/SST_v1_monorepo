@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '../prisma/client';
+import { Prisma, Role } from '../prisma/client';
 import { normalizeEmail, normalizeMobile } from '@sst/shared-utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -14,12 +14,44 @@ import {
   CreateCandidateDto,
   UpdateCandidateDto,
 } from './dto/candidates.dto';
+import { AuthUser } from '../auth/decorators/current-user.decorator';
+import { derivePipelineStage } from '../common/pipeline-stage';
 
 type StatusFields = {
   selected?: boolean;
   selectedAt?: Date | null;
   feedbackCode?: string | null;
 };
+
+const candidateOfferOnboardingInclude = {
+  offer: { select: { id: true, publicId: true, statusCode: true } },
+  onboarding: {
+    select: {
+      id: true,
+      publicId: true,
+      statusCode: true,
+      bgvStatusCode: true,
+    },
+  },
+} as const;
+
+const duplicateHistoryOfferInclude = {
+  select: {
+    statusCode: true,
+    offerInitiatedDate: true,
+    offerReleasedDate: true,
+    remarks: true,
+  },
+} as const;
+
+const duplicateHistoryOnboardingInclude = {
+  select: {
+    statusCode: true,
+    expectedDoj: true,
+    actualDoj: true,
+    remarks: true,
+  },
+} as const;
 
 @Injectable()
 export class CandidatesService {
@@ -53,15 +85,30 @@ export class CandidatesService {
   private toCandidateResponse(row: Record<string, unknown>) {
     const selected = Boolean(row.selected);
     const feedbackCode = (row.feedbackCode as string | null) ?? null;
+    const stageCode = (row.stageCode as string | null) ?? null;
+    const interviewRound = (row.interviewRound as string | null) ?? null;
+    const offer = (row.offer as { statusCode?: string } | null) ?? null;
+    const onboarding =
+      (row.onboarding as { statusCode?: string } | null) ?? null;
+    const pipeline = derivePipelineStage({
+      selected,
+      stageCode,
+      feedbackCode,
+      interviewRound,
+      offer,
+      onboarding,
+    });
     return {
       ...row,
       id: row.id,
       publicId: row.publicId,
       requirementId: row.requirementId,
-      stageCode: row.stageCode,
+      stageCode,
       feedbackCode,
       selected,
       candidateStatus: this.deriveCandidateStatus(selected, feedbackCode),
+      pipelineStage: pipeline.pipelineStage,
+      pipelineLabel: pipeline.pipelineLabel,
     };
   }
 
@@ -236,36 +283,209 @@ export class CandidatesService {
     return {};
   }
 
+  private async resolveExcludeCandidateId(
+    excludeId?: string,
+  ): Promise<string | undefined> {
+    if (!excludeId?.trim()) return undefined;
+    const trimmed = excludeId.trim();
+    if (this.isPublicId(trimmed)) {
+      const row = await this.prisma.candidate.findFirst({
+        where: { publicId: trimmed.toUpperCase(), deletedAt: null },
+        select: { id: true },
+      });
+      return row?.id;
+    }
+    return trimmed;
+  }
+
+  private toDuplicateHistoryItem(
+    row: {
+      id: string;
+      publicId: string;
+      name: string;
+      email: string;
+      mobile: string;
+      emailNormalized: string;
+      mobileNormalized: string;
+      stageCode: string;
+      feedbackCode: string | null;
+      interviewRound: string | null;
+      selected: boolean;
+      remarks: string | null;
+      profileSubmittedDate: Date | null;
+      clientShortlistDate: Date | null;
+      selectedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      requirement: {
+        id: string;
+        publicId: string;
+        roleSkill: string | null;
+        client: { name: string };
+      };
+      offer: {
+        statusCode: string;
+        offerInitiatedDate: Date | null;
+        offerReleasedDate: Date | null;
+        remarks: string | null;
+      } | null;
+      onboarding: {
+        statusCode: string;
+        expectedDoj: Date | null;
+        actualDoj: Date | null;
+        remarks: string | null;
+      } | null;
+    },
+    emailNorm: string | null,
+    mobileNorm: string | null,
+  ) {
+    const emailMatch =
+      emailNorm != null && row.emailNormalized === emailNorm;
+    const mobileMatch =
+      mobileNorm != null && row.mobileNormalized === mobileNorm;
+    const matchedBy: 'email' | 'mobile' | 'both' =
+      emailMatch && mobileMatch
+        ? 'both'
+        : emailMatch
+          ? 'email'
+          : 'mobile';
+    const pipeline = derivePipelineStage({
+      selected: row.selected,
+      stageCode: row.stageCode,
+      feedbackCode: row.feedbackCode,
+      interviewRound: row.interviewRound,
+      offer: row.offer,
+      onboarding: row.onboarding,
+    });
+    return {
+      id: row.id,
+      publicId: row.publicId,
+      name: row.name,
+      email: row.email,
+      mobile: row.mobile,
+      matchedBy,
+      requirement: {
+        id: row.requirement.id,
+        publicId: row.requirement.publicId,
+        roleSkill: row.requirement.roleSkill,
+        clientName: row.requirement.client.name,
+      },
+      stageCode: row.stageCode,
+      feedbackCode: row.feedbackCode,
+      interviewRound: row.interviewRound,
+      selected: row.selected,
+      candidateStatus: this.deriveCandidateStatus(
+        row.selected,
+        row.feedbackCode,
+      ),
+      remarks: row.remarks,
+      profileSubmittedDate: row.profileSubmittedDate,
+      clientShortlistDate: row.clientShortlistDate,
+      selectedAt: row.selectedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      offer: row.offer
+        ? {
+            statusCode: row.offer.statusCode,
+            offerInitiatedDate: row.offer.offerInitiatedDate,
+            offerReleasedDate: row.offer.offerReleasedDate,
+            remarks: row.offer.remarks,
+          }
+        : null,
+      onboarding: row.onboarding
+        ? {
+            statusCode: row.onboarding.statusCode,
+            expectedDoj: row.onboarding.expectedDoj,
+            actualDoj: row.onboarding.actualDoj,
+            remarks: row.onboarding.remarks,
+          }
+        : null,
+      pipelineStage: pipeline.pipelineStage,
+      pipelineLabel: pipeline.pipelineLabel,
+    };
+  }
+
+  async findDuplicateCandidates(
+    email?: string,
+    mobile?: string,
+    excludeId?: string,
+  ) {
+    const emailNorm = email?.trim() ? normalizeEmail(email) : null;
+    const mobileNorm = mobile?.trim() ? normalizeMobile(mobile) : null;
+    if (!emailNorm && !mobileNorm) {
+      throw new BadRequestException(
+        'At least one of email or mobile is required',
+      );
+    }
+
+    const excludeCandidateId = await this.resolveExcludeCandidateId(excludeId);
+    const orConditions: Prisma.CandidateWhereInput[] = [];
+    if (emailNorm) orConditions.push({ emailNormalized: emailNorm });
+    if (mobileNorm) orConditions.push({ mobileNormalized: mobileNorm });
+
+    const rows = await this.prisma.candidate.findMany({
+      where: {
+        deletedAt: null,
+        OR: orConditions,
+        ...(excludeCandidateId ? { id: { not: excludeCandidateId } } : {}),
+      },
+      include: {
+        requirement: {
+          select: {
+            id: true,
+            publicId: true,
+            roleSkill: true,
+            client: { select: { name: true } },
+          },
+        },
+        offer: duplicateHistoryOfferInclude,
+        onboarding: duplicateHistoryOnboardingInclude,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const matches = rows.map((row) =>
+      this.toDuplicateHistoryItem(row, emailNorm, mobileNorm),
+    );
+    const duplicateEmailCount = matches.filter(
+      (m) => m.matchedBy === 'email' || m.matchedBy === 'both',
+    ).length;
+    const duplicateMobileCount = matches.filter(
+      (m) => m.matchedBy === 'mobile' || m.matchedBy === 'both',
+    ).length;
+
+    return {
+      duplicateEmail: duplicateEmailCount > 0,
+      duplicateMobile: duplicateMobileCount > 0,
+      duplicateEmailCount,
+      duplicateMobileCount,
+      matches,
+    };
+  }
+
   private async duplicateFlags(
     mobileNorm: string,
     emailNorm: string,
     excludeId?: string,
   ) {
-    const [mobileDupes, emailDupes] = await Promise.all([
-      this.prisma.candidate.count({
-        where: {
-          mobileNormalized: mobileNorm,
-          deletedAt: null,
-          ...(excludeId ? { id: { not: excludeId } } : {}),
-        },
-      }),
-      this.prisma.candidate.count({
-        where: {
-          emailNormalized: emailNorm,
-          deletedAt: null,
-          ...(excludeId ? { id: { not: excludeId } } : {}),
-        },
-      }),
-    ]);
+    const result = await this.findDuplicateCandidates(
+      emailNorm,
+      mobileNorm,
+      excludeId,
+    );
     return {
-      duplicateMobile: mobileDupes > 0,
-      duplicateEmail: emailDupes > 0,
-      duplicateMobileCount: mobileDupes,
-      duplicateEmailCount: emailDupes,
+      duplicateMobile: result.duplicateMobile,
+      duplicateEmail: result.duplicateEmail,
+      duplicateMobileCount: result.duplicateMobileCount,
+      duplicateEmailCount: result.duplicateEmailCount,
+      duplicateHistory: result.matches,
     };
   }
 
-  async list(query: Record<string, string | undefined>) {
+  async list(
+    query: Record<string, string | undefined>,
+    actor?: AuthUser,
+  ) {
     const page = Number(query.page ?? 1);
     const pageSize = Number(query.pageSize ?? 20);
     const stageFilter = query.stageCode ?? query.candidateStage;
@@ -286,6 +506,9 @@ export class CandidatesService {
             ],
           }
         : {}),
+      ...(actor?.role === Role.SALES
+        ? { requirement: { salesOwnerId: actor.id, deletedAt: null } }
+        : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.candidate.findMany({
@@ -299,7 +522,7 @@ export class CandidatesService {
               client: { select: { name: true } },
             },
           },
-          offer: { select: { id: true, publicId: true, statusCode: true } },
+          ...candidateOfferOnboardingInclude,
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -322,7 +545,7 @@ export class CandidatesService {
         requirement: {
           include: { client: true },
         },
-        offer: true,
+        ...candidateOfferOnboardingInclude,
       },
     });
     if (!row) throw new NotFoundException('Candidate not found');
@@ -388,7 +611,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     await this.audit.log({
@@ -409,7 +632,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     const mapped = {
@@ -488,7 +711,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     const flags = await this.duplicateFlags(
@@ -515,7 +738,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     const mapped = {
@@ -546,7 +769,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     await this.audit.log({
@@ -568,7 +791,7 @@ export class CandidatesService {
         requirement: {
           select: { id: true, publicId: true, roleSkill: true },
         },
-        offer: { select: { id: true, publicId: true, statusCode: true } },
+        ...candidateOfferOnboardingInclude,
       },
     });
     return this.toCandidateResponse(refreshed ?? row);

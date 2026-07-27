@@ -141,9 +141,9 @@ Filters: `taOwnerId`, `salesOwnerId`, `priorityCode`, `clientId`, `jobFamilyId`,
 ```json
 {
   "requirementId": "<requirement.id UUID from POST /requirements>",
-  "name": "Yogesh kumar",
-  "mobile": "8527172822",
-  "email": "yogeshsingh1996@gmail.com",
+  "name": "<candidate full name>",
+  "mobile": "<mobile number>",
+  "email": "<email>",
   "source": "Referral",
   "position": "Core Python Developer",
   "jobFamily": "Application Development",

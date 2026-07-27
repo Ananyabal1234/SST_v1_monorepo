@@ -17,16 +17,16 @@ export class CreateCandidateDto {
   @IsUUID()
   requirementId!: string;
 
-  @ApiProperty({ example: 'Yogesh kumar' })
+  @ApiProperty({ description: 'Candidate full name' })
   @IsString()
   @MinLength(1)
   name!: string;
 
-  @ApiProperty({ example: '8527172822' })
+  @ApiProperty({ description: 'Mobile number' })
   @IsString()
   mobile!: string;
 
-  @ApiProperty({ example: 'yogeshsingh1996@gmail.com' })
+  @ApiProperty({ description: 'Email address' })
   @IsString()
   email!: string;
 
@@ -185,4 +185,23 @@ export class SelectCandidateDto {
   @ApiProperty()
   @IsBoolean()
   selected!: boolean;
+}
+
+export class DuplicateLookupQueryDto {
+  @ApiPropertyOptional({ description: 'Email to check for prior candidate rows' })
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Mobile to check for prior candidate rows' })
+  @IsOptional()
+  @IsString()
+  mobile?: string;
+
+  @ApiPropertyOptional({
+    description: 'Exclude this candidate (UUID or publicId CAN-00001) from matches',
+  })
+  @IsOptional()
+  @IsString()
+  excludeId?: string;
 }

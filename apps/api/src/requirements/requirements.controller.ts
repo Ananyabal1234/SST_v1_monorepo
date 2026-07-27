@@ -37,7 +37,7 @@ import { RequirementsQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Requirements')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.SALES, Role.TA, Role.HR, Role.LEADERSHIP_READONLY)
+@Roles(Role.ADMIN, Role.SALES, Role.TA, Role.HR)
 @Controller('requirements')
 export class RequirementsController {
   constructor(private readonly requirements: RequirementsService) {}
@@ -51,6 +51,22 @@ export class RequirementsController {
   @ApiProtectedErrors()
   list(@Query() query: RequirementsQueryDto): Promise<any> {
     return this.requirements.list(query as Record<string, string>);
+  }
+
+  @Get(':id/pipeline')
+  @Roles(Role.ADMIN, Role.SALES, Role.TA)
+  @ApiOperation({
+    operationId: 'getRequirementPipeline',
+    summary: 'Candidate pipeline board for a requirement (Sales own / TA / Admin)',
+  })
+  @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
+  @ApiOkResponse({ description: 'Requirement + candidates with pipelineStage' })
+  @ApiProtectedErrors()
+  getPipeline(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
+    return this.requirements.getPipeline(id, user);
   }
 
   @Get(':id')

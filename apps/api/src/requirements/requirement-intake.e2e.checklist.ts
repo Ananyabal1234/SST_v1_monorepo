@@ -3,7 +3,7 @@
  *
  * Run against a live local stack after `pnpm db:seed`:
  *
- * 1. Login as sales@sst.local / ChangeMeNow!
+ * 1. Login as a SALES user (create via Admin after seeding with SEED_ADMIN_*).
  * 2. POST /api/v1/requirements with core fields only → expect ACTIVE,
  *    openPositions = numberOfPositions, closedPositions = 0,
  *    closureStatus = ON_TRACK, taHandoffSlaRag from requirement age.

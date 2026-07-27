@@ -39,7 +39,7 @@ import {
 @ApiTags('Offers')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.HR, Role.TA, Role.LEADERSHIP_READONLY)
+@Roles(Role.ADMIN, Role.HR, Role.TA)
 @Controller('offers')
 export class OffersController {
   constructor(private readonly offers: OffersService) {}

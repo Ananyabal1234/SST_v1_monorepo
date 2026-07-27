@@ -20,7 +20,7 @@ import AddRequestScreen from './roles/AddRequestScreen';
 import AssignTaskScreen from './roles/AssignTaskScreen';
 import HrCandidatesScreen from './roles/HrCandidatesScreen';
 import OffersScreen from './roles/OffersScreen';
-import CreateUserScreen from './roles/CreateUserScreen';
+import UsersScreen from './roles/UsersScreen';
 import YourRequirementsScreen from './roles/YourRequirementsScreen';
 import MyTasksScreen from './roles/MyTasksScreen';
 
@@ -57,7 +57,7 @@ const SECONDARY_TABS = {
     { key: 'assign', label: 'Assign Task', icon: IconClipboardCheck },
     { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
     { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
-    { key: 'create-user', label: 'Create User', icon: IconUser },
+    { key: 'users', label: 'Users', icon: IconUser },
   ],
 };
 
@@ -397,7 +397,7 @@ export default function Dashboard() {
       <main className="main">
         <header className="topbar">
           <div className="topbar-title">
-            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'create-user' ? 'Create User' : `${roleScreen?.label} Workspace`}</h1>
+            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'users' ? 'Users' : `${roleScreen?.label} Workspace`}</h1>
             <span className="role-pill">{USER_TYPE_LABELS[userType]}</span>
           </div>
           <div className="topbar-meta">
@@ -461,8 +461,8 @@ export default function Dashboard() {
           <OffersScreen />
         ) : activeTab === 'hr-onboarding' ? (
           <HrCandidatesScreen />
-        ) : activeTab === 'create-user' ? (
-          <CreateUserScreen />
+        ) : activeTab === 'users' ? (
+          <UsersScreen />
         ) : (
           // Render the role-specific screen (each hits its own API endpoint)
           <roleScreen.Component />

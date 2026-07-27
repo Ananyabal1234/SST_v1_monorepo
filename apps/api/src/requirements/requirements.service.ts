@@ -15,6 +15,10 @@ import {
   UpdateRequirementDto,
 } from './dto/requirements.dto';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
+import {
+  derivePipelineStage,
+  type PipelineStageCode,
+} from '../common/pipeline-stage';
 
 const requirementInclude = {
   client: true,
@@ -292,6 +296,82 @@ export class RequirementsService {
     const row = await this.findRequirementOrThrow(id);
     const counts = await this.closedCounts([row.id]);
     return this.withDerived(row, counts.get(row.id) ?? 0);
+  }
+
+  /** Candidate pipeline board payload for Sales (own) / TA / Admin. */
+  async getPipeline(id: string, actor: AuthUser): Promise<any> {
+    const row = await this.findRequirementOrThrow(id);
+    if (actor.role === Role.SALES && row.salesOwnerId !== actor.id) {
+      throw new ForbiddenException(
+        'You can only view the pipeline for your own requirements',
+      );
+    }
+    if (actor.role === Role.HR) {
+      throw new ForbiddenException(
+        'HR does not have access to the recruiting pipeline',
+      );
+    }
+
+    const counts = await this.closedCounts([row.id]);
+    const requirement = this.withDerived(row, counts.get(row.id) ?? 0);
+
+    const candidates = await this.prisma.candidate.findMany({
+      where: { requirementId: row.id, deletedAt: null },
+      include: {
+        offer: { select: { id: true, publicId: true, statusCode: true } },
+        onboarding: {
+          select: {
+            id: true,
+            publicId: true,
+            statusCode: true,
+            bgvStatusCode: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const mapped = candidates.map((c) => {
+      const pipeline = derivePipelineStage({
+        selected: c.selected,
+        stageCode: c.stageCode,
+        feedbackCode: c.feedbackCode,
+        interviewRound: c.interviewRound,
+        offer: c.offer,
+        onboarding: c.onboarding,
+      });
+      return {
+        ...c,
+        pipelineStage: pipeline.pipelineStage,
+        pipelineLabel: pipeline.pipelineLabel,
+        candidateStatus: c.selected
+          ? 'Selected'
+          : (c.feedbackCode ?? '').toUpperCase() === 'NEGATIVE'
+            ? 'Rejected'
+            : 'Pending',
+      };
+    });
+
+    const countsByStage = mapped.reduce(
+      (acc, c) => {
+        const key = c.pipelineStage as PipelineStageCode;
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
+
+    return {
+      requirement,
+      summary: {
+        countsByStage,
+        totalCandidates: mapped.length,
+        openPositions: requirement.openPositions,
+        closedPositions: requirement.closedPositions,
+        numberOfPositions: requirement.numberOfPositions,
+      },
+      candidates: mapped,
+    };
   }
 
   async create(dto: CreateRequirementDto, actor: AuthUser): Promise<any> {
