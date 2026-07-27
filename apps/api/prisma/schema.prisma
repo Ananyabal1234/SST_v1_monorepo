@@ -22,6 +22,7 @@ model User {
   refreshTokens     RefreshToken[]
   salesRequirements Requirement[]  @relation("SalesOwner")
   taRequirements    Requirement[]  @relation("TaOwner")
+  taAssignments     RequirementTaAssignment[]
 
   @@map("users")
 }
@@ -118,6 +119,7 @@ model Requirement {
   jobFamily         JobFamily         @relation(fields: [jobFamilyId], references: [id])
   salesOwner        User              @relation("SalesOwner", fields: [salesOwnerId], references: [id])
   taOwner           User?             @relation("TaOwner", fields: [taOwnerId], references: [id])
+  taAssignments     RequirementTaAssignment[]
 
   @@index([status])
   @@index([taOwnerId])
@@ -125,6 +127,20 @@ model Requirement {
   @@index([clientId])
   @@index([requirementDate])
   @@map("requirements")
+}
+
+model RequirementTaAssignment {
+  id            String      @id @default(uuid())
+  requirementId String      @map("requirement_id")
+  userId        String      @map("user_id")
+  isPrimary     Boolean     @default(false) @map("is_primary")
+  assignedAt    DateTime    @default(now()) @map("assigned_at")
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([requirementId, userId])
+  @@index([userId])
+  @@map("requirement_ta_assignments")
 }
 
 model Candidate {

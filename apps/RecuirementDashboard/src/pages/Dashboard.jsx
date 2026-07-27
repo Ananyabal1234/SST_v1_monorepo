@@ -325,7 +325,19 @@ export default function Dashboard() {
     const clientName = getLabel(clientOptions, filters.client);
     const jobFamilyName = getLabel(jobFamilyOptions, filters.jobFamily);
 
-    if (filters.taOwner !== 'All' && taName && r.taOwner !== taName) return false;
+    if (filters.taOwner !== 'All' && taName) {
+      const owners = Array.isArray(r.taOwners)
+        ? r.taOwners.map((t) => (typeof t === 'string' ? t : t.fullName || t.name))
+        : [];
+      const primary =
+        typeof r.taOwner === 'string'
+          ? r.taOwner
+          : r.taOwner?.fullName || r.taOwner?.name;
+      const names = owners.length ? owners : primary ? [primary] : [];
+      if (!names.includes(taName) && r.taOwner !== taName && r.taOwnerId !== filters.taOwner) {
+        return false;
+      }
+    }
     if (filters.salesOwner !== 'All' && salesName && r.salesOwner !== salesName) return false;
     if (filters.client !== 'All' && clientName && r.client !== clientName) return false;
     if (filters.jobFamily !== 'All' && jobFamilyName && r.jobFamily !== jobFamilyName) return false;
@@ -521,6 +533,13 @@ function KpiModal({ kpi, onClose }) {
 
   const formatCell = (value) => {
     if (value == null) return '—';
+    if (Array.isArray(value)) {
+      if (!value.length) return '—';
+      return value
+        .map((v) => (typeof v === 'string' ? v : v?.fullName || v?.name || ''))
+        .filter(Boolean)
+        .join(', ') || '—';
+    }
     if (typeof value === 'object') {
       if ('publicId' in value && value.publicId) return value.publicId;
       if ('name' in value) return value.name;

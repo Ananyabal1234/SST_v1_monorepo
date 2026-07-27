@@ -162,15 +162,21 @@ export class ImportService {
         where: { email: obj.salesOwnerEmail.toLowerCase(), deletedAt: null },
       });
       if (!sales) continue;
-      let taOwnerId: string | undefined;
+      let taOwnerIds: string[] = [];
       if (obj.taOwnerEmail) {
-        const ta = await this.prisma.user.findFirst({
-          where: { email: obj.taOwnerEmail.toLowerCase(), deletedAt: null },
-        });
-        taOwnerId = ta?.id;
+        const emails = String(obj.taOwnerEmail)
+          .split(/[;,]/)
+          .map((e) => e.trim().toLowerCase())
+          .filter(Boolean);
+        for (const email of emails) {
+          const ta = await this.prisma.user.findFirst({
+            where: { email, deletedAt: null, role: 'TA', isActive: true },
+          });
+          if (ta && !taOwnerIds.includes(ta.id)) taOwnerIds.push(ta.id);
+        }
       }
       const publicId = await this.ids.next('requirement', 'REQ');
-      await this.prisma.requirement.create({
+      const reqRow = await this.prisma.requirement.create({
         data: {
           publicId,
           requirementDate: new Date(obj.requirementDate),
@@ -180,9 +186,18 @@ export class ImportService {
           numberOfPositions: Number(obj.numberOfPositions),
           salesOwnerId: sales.id,
           priorityCode: obj.priorityCode,
-          taOwnerId,
+          taOwnerId: taOwnerIds[0],
         },
       });
+      if (taOwnerIds.length) {
+        await this.prisma.requirementTaAssignment.createMany({
+          data: taOwnerIds.map((userId, index) => ({
+            requirementId: reqRow.id,
+            userId,
+            isPrimary: index === 0,
+          })),
+        });
+      }
       created += 1;
     }
     await this.audit.log({

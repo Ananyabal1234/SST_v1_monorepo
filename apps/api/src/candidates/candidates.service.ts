@@ -509,6 +509,14 @@ export class CandidatesService {
       ...(actor?.role === Role.SALES
         ? { requirement: { salesOwnerId: actor.id, deletedAt: null } }
         : {}),
+      ...(actor?.role === Role.TA
+        ? {
+            requirement: {
+              deletedAt: null,
+              taAssignments: { some: { userId: actor.id } },
+            },
+          }
+        : {}),
     };
     const [items, total] = await Promise.all([
       this.prisma.candidate.findMany({
@@ -557,9 +565,13 @@ export class CandidatesService {
     return { ...this.toCandidateResponse(row), ...flags };
   }
 
-  async create(dto: CreateCandidateDto, actorId: string): Promise<any> {
+  async create(dto: CreateCandidateDto, actor: AuthUser): Promise<any> {
+    await this.requirements.assertActorCanMutateCandidates(
+      dto.requirementId,
+      actor,
+    );
     // Heal wrongly CLOSED requirements that still have open seats (JOINED < positions).
-    await this.requirements.syncFillStatus(dto.requirementId, actorId);
+    await this.requirements.syncFillStatus(dto.requirementId, actor.id);
 
     const req = await this.prisma.requirement.findFirst({
       where: { id: dto.requirementId, deletedAt: null },
@@ -618,12 +630,12 @@ export class CandidatesService {
       entityType: 'Candidate',
       entityId: row.id,
       action: 'CREATE',
-      actorUserId: actorId,
+      actorUserId: actor.id,
       after: row,
     });
 
     if (row.selected) {
-      await this.offers.ensureForSelectedCandidate(row.id, actorId);
+      await this.offers.ensureForSelectedCandidate(row.id, actor.id);
     }
 
     const refreshed = await this.prisma.candidate.findFirst({
@@ -645,13 +657,17 @@ export class CandidatesService {
   async update(
     id: string,
     dto: UpdateCandidateDto,
-    actorId: string,
+    actor: AuthUser,
   ): Promise<any> {
     const before = await this.prisma.candidate.findFirst({
       where: this.whereById(id),
       include: { offer: true },
     });
     if (!before) throw new NotFoundException('Candidate not found');
+    await this.requirements.assertActorCanMutateCandidates(
+      before.requirementId,
+      actor,
+    );
 
     const mobileNormalized = dto.mobile
       ? normalizeMobile(dto.mobile)
@@ -723,13 +739,13 @@ export class CandidatesService {
       entityType: 'Candidate',
       entityId: before.id,
       action: 'UPDATE',
-      actorUserId: actorId,
+      actorUserId: actor.id,
       before,
       after: row,
     });
 
     if (row.selected && !before.offer) {
-      await this.offers.ensureForSelectedCandidate(row.id, actorId);
+      await this.offers.ensureForSelectedCandidate(row.id, actor.id);
     }
 
     const refreshed = await this.prisma.candidate.findFirst({
@@ -748,12 +764,16 @@ export class CandidatesService {
     return this.wrapCandidate(mapped, 'Candidate updated successfully');
   }
 
-  async select(id: string, selected: boolean, actorId: string): Promise<any> {
+  async select(id: string, selected: boolean, actor: AuthUser): Promise<any> {
     const before = await this.prisma.candidate.findFirst({
       where: this.whereById(id),
       include: { offer: true },
     });
     if (!before) throw new NotFoundException('Candidate not found');
+    await this.requirements.assertActorCanMutateCandidates(
+      before.requirementId,
+      actor,
+    );
     if (!selected && before.offer) {
       throw new BadRequestException(
         'Cannot unselect candidate with an existing offer',
@@ -776,13 +796,13 @@ export class CandidatesService {
       entityType: 'Candidate',
       entityId: before.id,
       action: 'SELECT',
-      actorUserId: actorId,
+      actorUserId: actor.id,
       before: { selected: before.selected },
       after: { selected: row.selected },
     });
 
     if (selected) {
-      await this.offers.ensureForSelectedCandidate(row.id, actorId);
+      await this.offers.ensureForSelectedCandidate(row.id, actor.id);
     }
 
     const refreshed = await this.prisma.candidate.findFirst({

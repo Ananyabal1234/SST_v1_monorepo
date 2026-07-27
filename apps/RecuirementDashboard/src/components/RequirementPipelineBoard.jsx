@@ -80,7 +80,11 @@ export default function RequirementPipelineBoard({
               Positions {closedPositions}/{totalPositions} filled
               {' · '}
               Open {openPositions}
-              {req?.taOwner?.fullName ? ` · TA ${req.taOwner.fullName}` : ''}
+              {req?.taOwners?.length
+                ? ` · TA ${req.taOwners.map((t) => t.fullName).filter(Boolean).join(', ')}`
+                : req?.taOwner?.fullName
+                  ? ` · TA ${req.taOwner.fullName}`
+                  : ''}
               {req?.salesOwner?.fullName ? ` · Sales ${req.salesOwner.fullName}` : ''}
             </p>
           </div>

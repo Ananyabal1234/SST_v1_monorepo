@@ -95,7 +95,7 @@ export class CandidatesController {
   @ApiCreatedResponse({ description: 'Created candidate' })
   @ApiMutateErrors()
   create(@Body() dto: CreateCandidateDto, @CurrentUser() user: AuthUser): Promise<any> {
-    return this.candidates.create(dto, user.id);
+    return this.candidates.create(dto, user);
   }
 
   @Roles(Role.ADMIN, Role.TA)
@@ -112,7 +112,7 @@ export class CandidatesController {
     @Body() dto: UpdateCandidateDto,
     @CurrentUser() user: AuthUser,
   ): Promise<any> {
-    return this.candidates.update(id, dto, user.id);
+    return this.candidates.update(id, dto, user);
   }
 
   @Roles(Role.ADMIN, Role.TA)
@@ -129,6 +129,6 @@ export class CandidatesController {
     @Body() dto: SelectCandidateDto,
     @CurrentUser() user: AuthUser,
   ): Promise<any> {
-    return this.candidates.select(id, dto.selected, user.id);
+    return this.candidates.select(id, dto.selected, user);
   }
 }

@@ -8,6 +8,7 @@ import {
 } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 import DuplicateCandidatePanel from '../../components/DuplicateCandidatePanel';
+import { formatTaOwnerNames } from '../../components/TaOwnersMultiSelect';
 
 const FALLBACK_STAGES = [
   { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
@@ -160,7 +161,8 @@ export default function AssignTaskScreen() {
             publicId: r.publicId,
             clientName: r.client?.name || '—',
             position: r.roleSkill || '—',
-            taOwner: r.taOwner?.fullName || '—',
+            taOwner: formatTaOwnerNames(r),
+            taOwners: Array.isArray(r.taOwners) ? r.taOwners : [],
             salesOwner: r.salesOwner?.fullName || '—',
             noOfPositions: r.numberOfPositions ?? '—',
             closedPositions,
@@ -483,6 +485,7 @@ export default function AssignTaskScreen() {
                     status: selectedTask.status,
                     client: { name: selectedTask.clientName },
                     taOwner: { fullName: selectedTask.taOwner },
+                    taOwners: selectedTask.taOwners,
                     salesOwner: { fullName: selectedTask.salesOwner },
                     numberOfPositions: selectedTask.noOfPositions,
                     openPositions: undefined,

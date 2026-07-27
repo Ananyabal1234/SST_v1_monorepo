@@ -3,6 +3,7 @@ import { post, get } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { addRequirement } from '../../services/requirementsStore';
 import { IconBriefcase, IconUser, IconTarget, IconFolderOpen, IconWallet, IconMapPin, IconClock, IconPlus, IconCalendar, IconFlag } from '../../components/Icons';
+import TaOwnersMultiSelect from '../../components/TaOwnersMultiSelect';
 
 const EMPTY = {
   requirementDate: '',
@@ -12,7 +13,7 @@ const EMPTY = {
   numberOfPositions: '',
   salesOwnerId: '',
   priorityCode: 'HIGH',
-  taOwnerId: '',
+  taOwnerIds: [],
   taHandoffDate: '',
   targetClosureDate: '',
   remarks: '',
@@ -33,7 +34,7 @@ const FIELDS = [
   { key: 'numberOfPositions', label: 'Number of Positions', type: 'number', icon: IconTarget, placeholder: 'e.g. 5', required: true, min: 1 },
   { key: 'salesOwnerId', label: 'Sales Owner', type: 'select-owner', ownerSource: 'sales', icon: IconUser, required: true },
   { key: 'priorityCode', label: 'Priority', type: 'select', icon: IconFlag, options: PRIORITY_OPTIONS, required: true },
-  { key: 'taOwnerId', label: 'TA Owner', type: 'select-owner', ownerSource: 'ta', icon: IconUser, required: true },
+  { key: 'taOwnerIds', label: 'TA Owners', type: 'select-ta-multi', icon: IconUser, required: true },
   { key: 'taHandoffDate', label: 'TA Handoff Date', type: 'date', icon: IconCalendar, required: false },
   { key: 'targetClosureDate', label: 'Target Closure Date', type: 'date', icon: IconCalendar, required: false },
   { key: 'experience', label: 'Experience (Years)', type: 'text', icon: IconUser, placeholder: 'e.g. 3-5', required: false },
@@ -111,7 +112,11 @@ export default function AddRequestScreen() {
     setError(null);
     setSuccess(null);
 
-    const missing = FIELDS.filter((f) => f.required && !String(form[f.key]).trim());
+    const missing = FIELDS.filter((f) => {
+      if (!f.required) return false;
+      if (f.key === 'taOwnerIds') return !(Array.isArray(form.taOwnerIds) && form.taOwnerIds.length);
+      return !String(form[f.key]).trim();
+    });
     if (missing.length) {
       setError(`Please fill: ${missing.map((m) => m.label).join(', ')}`);
       return;
@@ -157,7 +162,7 @@ export default function AddRequestScreen() {
         numberOfPositions: toInt(form.numberOfPositions),
         salesOwnerId: form.salesOwnerId,
         priorityCode: form.priorityCode,
-        taOwnerId: form.taOwnerId,
+        taOwnerIds: form.taOwnerIds,
         taHandoffDate: form.taHandoffDate || undefined,
         targetClosureDate: form.targetClosureDate || undefined,
         remarks: form.remarks || undefined,
@@ -243,6 +248,12 @@ export default function AddRequestScreen() {
                     ))}
                   </datalist>
                 </>
+              ) : f.type === 'select-ta-multi' ? (
+                <TaOwnersMultiSelect
+                  options={taMembers}
+                  value={form.taOwnerIds}
+                  onChange={(ids) => update('taOwnerIds', ids)}
+                />
               ) : f.type === 'select-owner' ? (
                 <select value={form[f.key]} onChange={(e) => update(f.key, e.target.value)}>
                   <option value="">Select {f.label}…</option>

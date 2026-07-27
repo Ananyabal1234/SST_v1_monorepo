@@ -49,8 +49,8 @@ export class RequirementsController {
   })
   @ApiOkResponse({ description: 'Paginated requirements' })
   @ApiProtectedErrors()
-  list(@Query() query: RequirementsQueryDto): Promise<any> {
-    return this.requirements.list(query as Record<string, string>);
+  list(@Query() query: RequirementsQueryDto, @CurrentUser() user: AuthUser): Promise<any> {
+    return this.requirements.list(query as Record<string, string>, user);
   }
 
   @Get(':id/pipeline')

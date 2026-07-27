@@ -42,7 +42,9 @@ export class DashboardService {
   ): Prisma.RequirementWhereInput {
     return {
       deletedAt: null,
-      ...(query.taOwnerId ? { taOwnerId: query.taOwnerId } : {}),
+      ...(query.taOwnerId
+        ? { taAssignments: { some: { userId: query.taOwnerId } } }
+        : {}),
       ...(query.salesOwnerId ? { salesOwnerId: query.salesOwnerId } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.jobFamilyId ? { jobFamilyId: query.jobFamilyId } : {}),
@@ -327,7 +329,17 @@ export class DashboardService {
       taOwner: { select: { id: true, fullName: true, email: true } },
       salesOwner: { select: { id: true, fullName: true, email: true } },
       jobFamily: { select: { id: true, name: true } },
-    } as const;
+      taAssignments: {
+        select: {
+          isPrimary: true,
+          user: { select: { id: true, fullName: true, email: true } },
+        },
+        orderBy: [
+          { isPrimary: 'desc' as const },
+          { assignedAt: 'asc' as const },
+        ],
+      },
+    };
 
     const [
       taOwners,
@@ -335,7 +347,7 @@ export class DashboardService {
       clients,
       jobFamilies,
       priorities,
-      requirements,
+      rawRequirements,
       candidatesInPipeline,
       selectedCandidates,
       offersReleased,
@@ -371,7 +383,7 @@ export class DashboardService {
       }),
       this.prisma.requirement.findMany({
         where: this.requirementWhere(query),
-        select: requirementSelect,
+        select: requirementSelect as Prisma.RequirementSelect,
         orderBy: { requirementDate: 'desc' },
       }),
       this.prisma.candidate.findMany({
@@ -477,6 +489,34 @@ export class DashboardService {
         orderBy: { createdAt: 'desc' },
       }),
     ]);
+
+    const requirements = (rawRequirements as any[]).map((r) => {
+      const taOwnersList = (r.taAssignments ?? []).map(
+        (a: { user: { id: string; fullName: string; email: string } }) => ({
+          id: a.user.id,
+          fullName: a.user.fullName,
+          email: a.user.email,
+        }),
+      );
+      const primary =
+        taOwnersList.find(
+          (t: { id: string }) => t.id === r.taOwner?.id,
+        ) ??
+        taOwnersList[0] ??
+        r.taOwner ??
+        null;
+      const { taAssignments: _a, ...rest } = r;
+      return {
+        ...rest,
+        taOwners: taOwnersList.length
+          ? taOwnersList
+          : primary
+            ? [primary]
+            : [],
+        taOwner: primary,
+        taOwnerId: primary?.id ?? null,
+      };
+    });
 
     const reqIds = requirements.map((r) => r.id);
     const mobileCounts = new Map<string, number>();
@@ -609,6 +649,7 @@ export class DashboardService {
           numberOfPositions: requirement.numberOfPositions,
           client: requirement.client,
           taOwner: requirement.taOwner,
+          taOwners: requirement.taOwners ?? [],
           salesOwner: requirement.salesOwner,
           joined: joined
             ? {

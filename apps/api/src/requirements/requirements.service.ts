@@ -29,11 +29,21 @@ const requirementInclude = {
   taOwner: {
     select: { id: true, fullName: true, email: true, role: true },
   },
+  taAssignments: {
+    include: {
+      user: {
+        select: { id: true, fullName: true, email: true, role: true },
+      },
+    },
+    orderBy: [{ isPrimary: 'desc' as const }, { assignedAt: 'asc' as const }],
+  },
 } satisfies Prisma.RequirementInclude;
 
 type RequirementRow = Prisma.RequirementGetPayload<{
   include: typeof requirementInclude;
 }>;
+
+type TxClient = Prisma.TransactionClient;
 
 @Injectable()
 export class RequirementsService {
@@ -86,7 +96,138 @@ export class RequirementsService {
       numberOfPositions: req.numberOfPositions,
       closedPositions,
     });
-    return { ...req, ...metrics };
+    const taOwners = this.mapTaOwners(req);
+    const taOwnerIds = taOwners.map((t) => t.id);
+    const primary =
+      taOwners.find((t) => t.id === req.taOwnerId) ?? taOwners[0] ?? null;
+    const { taAssignments: _assignments, ...rest } = req as RequirementRow & {
+      taAssignments?: unknown;
+    };
+    return {
+      ...rest,
+      ...metrics,
+      taOwners,
+      taOwnerIds,
+      taOwner: primary
+        ? {
+            id: primary.id,
+            fullName: primary.fullName,
+            email: primary.email,
+            role: (req.taOwner as { role?: string } | null)?.role ?? Role.TA,
+          }
+        : null,
+      taOwnerId: primary?.id ?? null,
+    };
+  }
+
+  private mapTaOwners(req: {
+    taAssignments?: Array<{
+      isPrimary: boolean;
+      user: { id: string; fullName: string; email: string };
+    }>;
+    taOwner?: { id: string; fullName: string; email: string } | null;
+  }) {
+    const fromAssignments = (req.taAssignments ?? []).map((a) => ({
+      id: a.user.id,
+      fullName: a.user.fullName,
+      email: a.user.email,
+      isPrimary: a.isPrimary,
+    }));
+    if (fromAssignments.length) {
+      return fromAssignments.map(({ id, fullName, email }) => ({
+        id,
+        fullName,
+        email,
+      }));
+    }
+    if (req.taOwner) {
+      return [
+        {
+          id: req.taOwner.id,
+          fullName: req.taOwner.fullName,
+          email: req.taOwner.email,
+        },
+      ];
+    }
+    return [];
+  }
+
+  /** Normalize create/update TA fields into a deduped id list (primary first). */
+  private normalizeTaOwnerIds(input: {
+    taOwnerIds?: string[] | null;
+    taOwnerId?: string | null;
+  }): string[] | undefined {
+    if (input.taOwnerIds !== undefined) {
+      const seen = new Set<string>();
+      const ids: string[] = [];
+      for (const id of input.taOwnerIds ?? []) {
+        if (!id || seen.has(id)) continue;
+        seen.add(id);
+        ids.push(id);
+      }
+      return ids;
+    }
+    if (input.taOwnerId !== undefined) {
+      return input.taOwnerId ? [input.taOwnerId] : [];
+    }
+    return undefined;
+  }
+
+  private async syncTaAssignments(
+    requirementId: string,
+    taOwnerIds: string[],
+    tx: TxClient,
+  ): Promise<string | null> {
+    for (const id of taOwnerIds) {
+      await this.assertOwner(id, Role.TA, 'taOwnerIds');
+    }
+    await tx.requirementTaAssignment.deleteMany({ where: { requirementId } });
+    if (taOwnerIds.length) {
+      await tx.requirementTaAssignment.createMany({
+        data: taOwnerIds.map((userId, index) => ({
+          requirementId,
+          userId,
+          isPrimary: index === 0,
+        })),
+      });
+    }
+    const primaryId = taOwnerIds[0] ?? null;
+    await tx.requirement.update({
+      where: { id: requirementId },
+      data: { taOwnerId: primaryId },
+    });
+    return primaryId;
+  }
+
+  private async isAssignedTa(
+    requirementId: string,
+    userId: string,
+  ): Promise<boolean> {
+    const row = await this.prisma.requirementTaAssignment.findUnique({
+      where: {
+        requirementId_userId: { requirementId, userId },
+      },
+    });
+    if (row) return true;
+    // Compat: legacy primary-only row before backfill catch-up
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: requirementId, taOwnerId: userId, deletedAt: null },
+      select: { id: true },
+    });
+    return Boolean(req);
+  }
+
+  private async assertTaCanAccessRequirement(
+    requirementId: string,
+    actor: AuthUser,
+  ) {
+    if (actor.role !== Role.TA) return;
+    const ok = await this.isAssignedTa(requirementId, actor.id);
+    if (!ok) {
+      throw new ForbiddenException(
+        'TA may only access requirements assigned to them',
+      );
+    }
   }
 
   private async assertActiveClient(clientId: string) {
@@ -212,7 +353,10 @@ export class RequirementsService {
     }
   }
 
-  async list(query: Record<string, string | undefined>): Promise<any> {
+  async list(
+    query: Record<string, string | undefined>,
+    actor?: AuthUser,
+  ): Promise<any> {
     const page = Math.max(1, Number(query.page ?? 1) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize ?? 25) || 25));
     const where: Prisma.RequirementWhereInput = {
@@ -220,11 +364,19 @@ export class RequirementsService {
       ...(query.status
         ? { status: query.status as RequirementStatus }
         : {}),
-      ...(query.taOwnerId ? { taOwnerId: query.taOwnerId } : {}),
+      ...(query.taOwnerId
+        ? { taAssignments: { some: { userId: query.taOwnerId } } }
+        : {}),
       ...(query.salesOwnerId ? { salesOwnerId: query.salesOwnerId } : {}),
       ...(query.clientId ? { clientId: query.clientId } : {}),
       ...(query.jobFamilyId ? { jobFamilyId: query.jobFamilyId } : {}),
       ...(query.priorityCode ? { priorityCode: query.priorityCode } : {}),
+      ...(actor?.role === Role.TA
+        ? { taAssignments: { some: { userId: actor.id } } }
+        : {}),
+      ...(actor?.role === Role.SALES
+        ? { salesOwnerId: actor.id }
+        : {}),
       ...(query.q
         ? {
             OR: [
@@ -239,6 +391,15 @@ export class RequirementsService {
               {
                 taOwner: {
                   fullName: { contains: query.q, mode: 'insensitive' },
+                },
+              },
+              {
+                taAssignments: {
+                  some: {
+                    user: {
+                      fullName: { contains: query.q, mode: 'insensitive' },
+                    },
+                  },
                 },
               },
             ],
@@ -298,7 +459,7 @@ export class RequirementsService {
     return this.withDerived(row, counts.get(row.id) ?? 0);
   }
 
-  /** Candidate pipeline board payload for Sales (own) / TA / Admin. */
+  /** Candidate pipeline board payload for Sales (own) / assigned TA / Admin. */
   async getPipeline(id: string, actor: AuthUser): Promise<any> {
     const row = await this.findRequirementOrThrow(id);
     if (actor.role === Role.SALES && row.salesOwnerId !== actor.id) {
@@ -311,6 +472,7 @@ export class RequirementsService {
         'HR does not have access to the recruiting pipeline',
       );
     }
+    await this.assertTaCanAccessRequirement(row.id, actor);
 
     const counts = await this.closedCounts([row.id]);
     const requirement = this.withDerived(row, counts.get(row.id) ?? 0);
@@ -379,8 +541,9 @@ export class RequirementsService {
     await this.assertActiveJobFamily(dto.jobFamilyId);
     await this.assertPriorityCode(dto.priorityCode);
     await this.assertOwner(dto.salesOwnerId, Role.SALES, 'salesOwnerId');
-    if (dto.taOwnerId) {
-      await this.assertOwner(dto.taOwnerId, Role.TA, 'taOwnerId');
+    const taOwnerIds = this.normalizeTaOwnerIds(dto) ?? [];
+    for (const id of taOwnerIds) {
+      await this.assertOwner(id, Role.TA, 'taOwnerIds');
     }
     this.validateBudgets(dto.minBudget, dto.maxBudget);
     this.validateDates({
@@ -391,6 +554,7 @@ export class RequirementsService {
 
     const row = await this.prisma.$transaction(async (tx) => {
       const publicId = await this.ids.next('requirement', 'REQ', tx);
+      const primaryTaId = taOwnerIds[0] ?? null;
       const created = await tx.requirement.create({
         data: {
           publicId,
@@ -401,7 +565,7 @@ export class RequirementsService {
           numberOfPositions: dto.numberOfPositions,
           salesOwnerId: dto.salesOwnerId,
           priorityCode: dto.priorityCode,
-          taOwnerId: dto.taOwnerId || undefined,
+          taOwnerId: primaryTaId || undefined,
           taHandoffDate: dto.taHandoffDate
             ? new Date(dto.taHandoffDate)
             : undefined,
@@ -417,17 +581,24 @@ export class RequirementsService {
         },
         include: requirementInclude,
       });
+      if (taOwnerIds.length) {
+        await this.syncTaAssignments(created.id, taOwnerIds, tx);
+      }
+      const refreshed = await tx.requirement.findFirst({
+        where: { id: created.id },
+        include: requirementInclude,
+      });
       await this.audit.log(
         {
           entityType: 'Requirement',
           entityId: created.id,
           action: 'CREATE',
           actorUserId: actor.id,
-          after: created,
+          after: refreshed ?? created,
         },
         tx,
       );
-      return created;
+      return refreshed ?? created;
     });
 
     return this.withDerived(row, 0);
@@ -439,7 +610,7 @@ export class RequirementsService {
   }
 
   /** Full-body edit after creation (Sales/Admin). Sales cannot reassign owner. */
-  async replace(id: string, dto: CreateRequirementDto, actor: AuthUser) : Promise<RequirementRow & Record<string, unknown>>{
+  async replace(id: string, dto: CreateRequirementDto, actor: AuthUser): Promise<any> {
     const before = await this.findRequirementOrThrow(id);
     if (actor.role === Role.SALES && before.salesOwnerId !== actor.id) {
       throw new ForbiddenException(
@@ -454,7 +625,7 @@ export class RequirementsService {
       jobFamilyId: dto.jobFamilyId,
       numberOfPositions: dto.numberOfPositions,
       priorityCode: dto.priorityCode,
-      taOwnerId: dto.taOwnerId ?? null,
+      taOwnerIds: this.normalizeTaOwnerIds(dto) ?? [],
       taHandoffDate: dto.taHandoffDate ?? null,
       targetClosureDate: dto.targetClosureDate ?? null,
       remarks: dto.remarks ?? null,
@@ -470,7 +641,7 @@ export class RequirementsService {
     return this.update(id, payload, actor);
   }
 
-  async update(id: string, dto: UpdateRequirementDto, actor: AuthUser): Promise<RequirementRow & Record<string, unknown>>  {
+  async update(id: string, dto: UpdateRequirementDto, actor: AuthUser): Promise<any> {
     const before = await this.findRequirementOrThrow(id);
 
     let payload = dto;
@@ -482,11 +653,7 @@ export class RequirementsService {
       }
       payload = this.pickSalesUpdate(dto);
     } else if (actor.role === Role.TA) {
-      if (before.taOwnerId && before.taOwnerId !== actor.id) {
-        throw new ForbiddenException(
-          'TA may only update requirements assigned to them',
-        );
-      }
+      await this.assertTaCanAccessRequirement(before.id, actor);
       payload = this.pickTaUpdate(dto);
     }
 
@@ -497,8 +664,13 @@ export class RequirementsService {
       await this.assertPriorityCode(payload.priorityCode);
     if (payload.salesOwnerId)
       await this.assertOwner(payload.salesOwnerId, Role.SALES, 'salesOwnerId');
-    if (payload.taOwnerId)
-      await this.assertOwner(payload.taOwnerId, Role.TA, 'taOwnerId');
+
+    const nextTaOwnerIds = this.normalizeTaOwnerIds(payload);
+    if (nextTaOwnerIds) {
+      for (const taId of nextTaOwnerIds) {
+        await this.assertOwner(taId, Role.TA, 'taOwnerIds');
+      }
+    }
 
     const minBudget =
       payload.minBudget !== undefined
@@ -548,11 +720,6 @@ export class RequirementsService {
       data.numberOfPositions = payload.numberOfPositions;
     if (payload.salesOwnerId !== undefined)
       data.salesOwner = { connect: { id: payload.salesOwnerId } };
-    if (payload.taOwnerId !== undefined) {
-      data.taOwner = payload.taOwnerId
-        ? { connect: { id: payload.taOwnerId } }
-        : { disconnect: true };
-    }
     if (payload.priorityCode !== undefined)
       data.priorityCode = payload.priorityCode;
     if (payload.taHandoffDate !== undefined)
@@ -575,9 +742,15 @@ export class RequirementsService {
       data.durationMonths = payload.durationMonths;
 
     const row = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.requirement.update({
+      await tx.requirement.update({
         where: { id: before.id },
         data,
+      });
+      if (nextTaOwnerIds) {
+        await this.syncTaAssignments(before.id, nextTaOwnerIds, tx);
+      }
+      const updated = await tx.requirement.findFirstOrThrow({
+        where: { id: before.id },
         include: requirementInclude,
       });
       await this.audit.log(
@@ -596,6 +769,20 @@ export class RequirementsService {
 
     const counts = await this.closedCounts([row.id]);
     return this.withDerived(row, counts.get(row.id) ?? 0);
+  }
+
+  async assertActorCanMutateCandidates(
+    requirementId: string,
+    actor: AuthUser,
+  ): Promise<void> {
+    if (actor.role === Role.ADMIN) return;
+    if (actor.role === Role.TA) {
+      await this.assertTaCanAccessRequirement(requirementId, actor);
+      return;
+    }
+    throw new ForbiddenException(
+      'Only Admin or assigned TA may mutate candidates on a requirement',
+    );
   }
 
   async setStatus(id: string, status: RequirementStatus, actor: AuthUser): Promise<any> {

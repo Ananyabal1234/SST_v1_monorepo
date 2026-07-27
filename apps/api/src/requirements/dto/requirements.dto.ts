@@ -1,4 +1,6 @@
 import {
+  ArrayUnique,
+  IsArray,
   IsDateString,
   IsEnum,
   IsInt,
@@ -45,7 +47,22 @@ export class CreateRequirementDto {
   @MinLength(1)
   priorityCode!: string;
 
-  @ApiPropertyOptional({ format: 'uuid', nullable: true })
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description: 'One or more TA user IDs assigned to this requirement (shared pool)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  taOwnerIds?: string[];
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    nullable: true,
+    description: 'Legacy single TA; normalized into taOwnerIds when taOwnerIds omitted',
+  })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
   @IsUUID()
@@ -130,6 +147,17 @@ export class UpdateRequirementDto {
   @IsUUID()
   salesOwnerId?: string;
 
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description: 'Replace full TA assignment set (shared pool)',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  taOwnerIds?: string[];
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
@@ -198,6 +226,7 @@ export class RequirementStatusDto {
 /** Fields a TA user may update on an assigned requirement. */
 export const TA_UPDATE_FIELDS = [
   'taOwnerId',
+  'taOwnerIds',
   'taHandoffDate',
   'remarks',
 ] as const;

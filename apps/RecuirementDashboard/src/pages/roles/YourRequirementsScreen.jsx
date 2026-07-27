@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import TaOwnersMultiSelect, { formatTaOwnerNames } from '../../components/TaOwnersMultiSelect';
 
 // Shows the requirements from the live backend (GET /api/v1/requirements).
 // Sales users see only the requirements they own (salesOwnerId === user.id);
@@ -145,7 +146,13 @@ export default function YourRequirementsScreen() {
       numberOfPositions: r.numberOfPositions ?? '',
       salesOwnerId: r.salesOwner?.id || r.salesOwnerId || '',
       priorityCode: r.priorityCode || 'HIGH',
-      taOwnerId: r.taOwner?.id || r.taOwnerId || '',
+      taOwnerIds: Array.isArray(r.taOwnerIds) && r.taOwnerIds.length
+        ? r.taOwnerIds
+        : Array.isArray(r.taOwners) && r.taOwners.length
+          ? r.taOwners.map((t) => t.id)
+          : r.taOwner?.id || r.taOwnerId
+            ? [r.taOwner?.id || r.taOwnerId]
+            : [],
       taHandoffDate: (r.taHandoffDate || '').slice(0, 10),
       targetClosureDate: (r.targetClosureDate || '').slice(0, 10),
       remarks: r.remarks || '',
@@ -199,7 +206,7 @@ export default function YourRequirementsScreen() {
       numberOfPositions: toInt(form.numberOfPositions),
       salesOwnerId: form.salesOwnerId,
       priorityCode: form.priorityCode,
-      taOwnerId: form.taOwnerId,
+      taOwnerIds: Array.isArray(form.taOwnerIds) ? form.taOwnerIds : [],
       taHandoffDate: form.taHandoffDate || undefined,
       targetClosureDate: form.targetClosureDate || undefined,
       remarks: form.remarks || undefined,
@@ -322,7 +329,7 @@ export default function YourRequirementsScreen() {
                   <td>{r.priorityCode || '—'}</td>
                   <td>{r.jobLocation || '—'}</td>
                   <td>{r.salesOwner?.fullName || '—'}</td>
-                  <td>{r.taOwner?.fullName || '—'}</td>
+                  <td>{formatTaOwnerNames(r)}</td>
                   <td>
                     <span className={`yr-status ${(r.status || 'ACTIVE').toLowerCase()}`}>{r.status || 'ACTIVE'}</span>
                   </td>
@@ -453,14 +460,13 @@ export default function YourRequirementsScreen() {
                       {PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
                     </select>
                   </div>
-                  <div className="detail-field">
-                    <span className="detail-label">TA Owner</span>
-                    <select value={form.taOwnerId} onChange={(e) => setField('taOwnerId', e.target.value)}>
-                      <option value="">Select TA owner…</option>
-                      {taOwners.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
+                  <div className="detail-field full">
+                    <span className="detail-label">TA Owners</span>
+                    <TaOwnersMultiSelect
+                      options={taOwnerOptions}
+                      value={form.taOwnerIds || []}
+                      onChange={(ids) => setField('taOwnerIds', ids)}
+                    />
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">TA Handoff Date</span>
