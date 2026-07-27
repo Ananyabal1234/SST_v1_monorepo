@@ -225,8 +225,24 @@ export default function AssignTaskScreen() {
   }, []);
 
   const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null;
+  const recruitingBlocked =
+    selectedTask?.status === 'ON_HOLD'
+    || selectedTask?.status === 'CANCELLED'
+    || selectedTask?.status === 'CLOSED';
 
   const openAdd = (task) => {
+    if (
+      task?.status === 'ON_HOLD'
+      || task?.status === 'CANCELLED'
+      || task?.status === 'CLOSED'
+    ) {
+      setError(
+        task.status === 'ON_HOLD'
+          ? 'Requirement is on hold; recruiting is paused until it is resumed'
+          : `Cannot add candidates to a ${task.status} requirement`,
+      );
+      return;
+    }
     clearDuplicateLookup();
     setEditing(null);
     setForm({
@@ -271,6 +287,14 @@ export default function AssignTaskScreen() {
   };
 
   const handleSelectFromPipeline = async (cand, selected = true) => {
+    if (recruitingBlocked) {
+      setError(
+        selectedTask?.status === 'ON_HOLD'
+          ? 'Requirement is on hold; recruiting is paused until it is resumed'
+          : `Cannot select candidates on a ${selectedTask?.status || 'unavailable'} requirement`,
+      );
+      return;
+    }
     try {
       setError(null);
       await post(`${ENDPOINTS.CANDIDATES}/${cand.id}/select`, { selected });
@@ -443,6 +467,9 @@ export default function AssignTaskScreen() {
                 <span><IconMapPin /> {t.jobLocation}</span>
                 <span><IconClock /> {t.duration !== '—' ? `${t.duration} years` : '—'}</span>
               </div>
+              <div className="task-meta">
+                <span className={`yr-status ${(t.status || 'ACTIVE').toLowerCase()}`}>{t.status || 'ACTIVE'}</span>
+              </div>
             </button>
           ))}
         </aside>
@@ -464,11 +491,21 @@ export default function AssignTaskScreen() {
                   >
                     {viewMode === 'pipeline' ? 'Table view' : 'Pipeline view'}
                   </button>
-                  <button className="add-cand-btn" onClick={() => openAdd(selectedTask)}>
-                    <IconPlus /> Add Candidate
-                  </button>
+                  {!recruitingBlocked && (
+                    <button className="add-cand-btn" onClick={() => openAdd(selectedTask)}>
+                      <IconPlus /> Add Candidate
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {recruitingBlocked && (
+                <div className="pipeline-recruiting-paused">
+                  {selectedTask.status === 'ON_HOLD'
+                    ? 'Requirement is on hold — Add Candidate and Select are disabled until resumed.'
+                    : `Requirement is ${selectedTask.status} — recruiting actions are disabled.`}
+                </div>
+              )}
 
               {error && <div className="add-error">{Array.isArray(error) ? error.join(', ') : error}</div>}
               {success && <div className="add-success">{success}</div>}
@@ -536,9 +573,11 @@ export default function AssignTaskScreen() {
                           );
                         })}
                         <td>
-                          <button className="cand-edit" onClick={(e) => { e.stopPropagation(); openEdit(c); }} title="Edit">
-                            <IconEdit /> Edit
-                          </button>
+                          {!recruitingBlocked && (
+                            <button className="cand-edit" onClick={(e) => { e.stopPropagation(); openEdit(c); }} title="Edit">
+                              <IconEdit /> Edit
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

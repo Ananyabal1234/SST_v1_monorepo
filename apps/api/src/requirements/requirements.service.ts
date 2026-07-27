@@ -825,6 +825,7 @@ export class RequirementsService {
   }
 
   /** Recount joined fills and auto-close / reopen ACTIVE↔CLOSED.
+   * Auto-close only from ACTIVE (ON_HOLD stays held until resume).
    * CLOSED only when JOINED count covers all seats; reopen when seats remain.
    */
   async syncFillStatus(
@@ -848,10 +849,8 @@ export class RequirementsService {
     });
 
     let nextStatus: RequirementStatus | null = null;
-    if (
-      joined >= req.numberOfPositions &&
-      (req.status === 'ACTIVE' || req.status === 'ON_HOLD')
-    ) {
+    // Auto-close only from ACTIVE so Hold pauses recruiting without fill-sync closing.
+    if (joined >= req.numberOfPositions && req.status === 'ACTIVE') {
       nextStatus = 'CLOSED';
     } else if (
       req.status === 'CLOSED' &&

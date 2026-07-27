@@ -59,6 +59,8 @@ export default function RequirementPipelineBoard({
 
   const editable = mode === 'edit';
   const req = requirement || requirementProp;
+  const recruitingBlocked =
+    req?.status === 'ON_HOLD' || req?.status === 'CANCELLED' || req?.status === 'CLOSED';
   const openPositions = summary?.openPositions ?? req?.openPositions ?? '—';
   const closedPositions = summary?.closedPositions ?? req?.closedPositions ?? '—';
   const totalPositions = summary?.numberOfPositions ?? req?.numberOfPositions ?? '—';
@@ -88,13 +90,20 @@ export default function RequirementPipelineBoard({
               {req?.salesOwner?.fullName ? ` · Sales ${req.salesOwner.fullName}` : ''}
             </p>
           </div>
-          {editable && onAddCandidate && (
+          {editable && onAddCandidate && !recruitingBlocked && (
             <button type="button" className="add-cand-btn" onClick={() => onAddCandidate(req)}>
               <IconPlus />
               <span>Add candidate</span>
             </button>
           )}
         </div>
+        {editable && recruitingBlocked && (
+          <div className="pipeline-recruiting-paused">
+            {req?.status === 'ON_HOLD'
+              ? 'Requirement is on hold — Add Candidate and Select are disabled until resumed.'
+              : `Requirement is ${req?.status || 'unavailable'} — recruiting actions are disabled.`}
+          </div>
+        )}
 
         <div className="pipeline-count-chips">
           {PIPELINE_COLUMNS.map((col) => {
@@ -147,12 +156,12 @@ export default function RequirementPipelineBoard({
                         <div className="pipeline-card-meta">{cardSubtitle(c) || pipelineLabel}</div>
                         {editable && (
                           <div className="pipeline-card-actions" onClick={(e) => e.stopPropagation()}>
-                            {onEditCandidate && (
+                            {onEditCandidate && !recruitingBlocked && (
                               <button type="button" className="cand-edit" onClick={() => onEditCandidate(c)}>
                                 Edit
                               </button>
                             )}
-                            {onSelectCandidate && !c.selected && !c.offer && (
+                            {onSelectCandidate && !recruitingBlocked && !c.selected && !c.offer && (
                               <button
                                 type="button"
                                 className="cand-edit"

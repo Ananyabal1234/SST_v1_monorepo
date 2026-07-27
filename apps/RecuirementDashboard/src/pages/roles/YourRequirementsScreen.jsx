@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { get, put } from '../../services/apiClient';
+import { get, put, post } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
@@ -30,6 +30,9 @@ export default function YourRequirementsScreen() {
   const [taOwnerOptions, setTaOwnerOptions] = useState([]);
   const [myTaskCandidates, setMyTaskCandidates] = useState({});
   const [myTaskLoading, setMyTaskLoading] = useState({});
+  const [statusBusyId, setStatusBusyId] = useState(null);
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [statusError, setStatusError] = useState(null);
 
   const normalizeId = (value) => (value == null ? null : String(value).trim());
   const normalizeEmail = (value) => (value == null ? null : String(value).trim().toLowerCase());
@@ -117,7 +120,9 @@ export default function YourRequirementsScreen() {
   const taOwners = useMemo(() => taOwnerOptions.map((o) => ({ id: o.id, name: o.fullName || o.name || o.email || o.id })), [taOwnerOptions]);
 
   const PRIORITIES = ['HIGH', 'MEDIUM', 'LOW', 'CRITICAL'];
-  const STATUSES = ['ACTIVE', 'CLOSED', 'ON_HOLD', 'DRAFT'];
+  const STATUSES = ['ACTIVE', 'ON_HOLD', 'CLOSED', 'CANCELLED'];
+
+  const canManageStatus = user?.userType === 'admin' || user?.userType === 'sales';
 
   const visible = useMemo(() => {
     return items.filter((r) => {
@@ -133,6 +138,42 @@ export default function YourRequirementsScreen() {
   const update = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
   const clearFilters = () => setFilters({ clientId: '', priorityCode: '', status: '' });
   const hasFilters = filters.clientId || filters.priorityCode || filters.status;
+
+  const changeRequirementStatus = async (requirement, nextStatus) => {
+    if (!requirement?.id || !canManageStatus) return;
+    if (nextStatus === 'CANCELLED') {
+      const label = requirement.publicId || requirement.roleSkill || 'this requirement';
+      const ok = window.confirm(
+        `Cancel ${label}?\n\nRecruiting will stop and this will appear under Cancelled on the dashboard.`,
+      );
+      if (!ok) return;
+    }
+
+    setStatusBusyId(requirement.id);
+    setStatusMessage(null);
+    setStatusError(null);
+    try {
+      const updated = await post(`${ENDPOINTS.REQUIREMENTS}/${requirement.id}/status`, {
+        status: nextStatus,
+      });
+      const next = updated?.status || nextStatus;
+      setItems((prev) => prev.map((r) => (
+        r.id === requirement.id ? { ...r, ...updated, status: next } : r
+      )));
+      setStatusMessage(
+        next === 'ON_HOLD'
+          ? `Requirement ${requirement.publicId || ''} put on hold`
+          : next === 'ACTIVE'
+            ? `Requirement ${requirement.publicId || ''} resumed`
+            : `Requirement ${requirement.publicId || ''} cancelled`,
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update requirement status';
+      setStatusError(Array.isArray(msg) ? msg.join(', ') : msg);
+    } finally {
+      setStatusBusyId(null);
+    }
+  };
 
   const openEdit = (r) => {
     setEditing(r);
@@ -285,6 +326,9 @@ export default function YourRequirementsScreen() {
         </div>
       )}
 
+      {statusMessage && <div className="add-success">{statusMessage}</div>}
+      {statusError && <div className="add-error">{statusError}</div>}
+
       {loading ? (
         <div className="screen-loading"><div className="spinner" /></div>
       ) : error ? (
@@ -335,17 +379,48 @@ export default function YourRequirementsScreen() {
                   </td>
                   <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}</td>
                   <td>
-                    <button
-                      className="cand-edit"
-                      onClick={(e) => { e.stopPropagation(); openRequirementDetails(r); }}
-                      title="View pipeline"
-                    >
-                      <IconClipboardCheck /> Pipeline
-                    </button>
-                    {' '}
-                    <button className="cand-edit" onClick={(e) => { e.stopPropagation(); openEdit(r); }} title="Edit">
-                      <IconEdit /> Edit
-                    </button>
+                    <div className="yr-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        className="cand-edit"
+                        onClick={() => openRequirementDetails(r)}
+                        title="View pipeline"
+                      >
+                        <IconClipboardCheck /> Pipeline
+                      </button>
+                      <button className="cand-edit" onClick={() => openEdit(r)} title="Edit">
+                        <IconEdit /> Edit
+                      </button>
+                      {canManageStatus && (r.status || 'ACTIVE') === 'ACTIVE' && (
+                        <button
+                          className="cand-edit yr-status-btn"
+                          disabled={statusBusyId === r.id}
+                          onClick={() => changeRequirementStatus(r, 'ON_HOLD')}
+                          title="Put on hold"
+                        >
+                          Hold
+                        </button>
+                      )}
+                      {canManageStatus && r.status === 'ON_HOLD' && (
+                        <button
+                          className="cand-edit yr-status-btn"
+                          disabled={statusBusyId === r.id}
+                          onClick={() => changeRequirementStatus(r, 'ACTIVE')}
+                          title="Resume recruiting"
+                        >
+                          Resume
+                        </button>
+                      )}
+                      {canManageStatus && (r.status === 'ACTIVE' || r.status === 'ON_HOLD') && (
+                        <button
+                          className="cand-edit yr-status-btn yr-status-btn--danger"
+                          disabled={statusBusyId === r.id}
+                          onClick={() => changeRequirementStatus(r, 'CANCELLED')}
+                          title="Cancel requirement"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

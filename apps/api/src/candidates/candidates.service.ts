@@ -123,6 +123,19 @@ export class CandidatesService {
     };
   }
 
+  private assertRequirementAllowsRecruiting(status: string): void {
+    if (status === 'ON_HOLD') {
+      throw new BadRequestException(
+        'Requirement is on hold; recruiting is paused until it is resumed',
+      );
+    }
+    if (status === 'CANCELLED' || status === 'CLOSED') {
+      throw new BadRequestException(
+        'Cannot modify candidates on a Cancelled or Closed requirement',
+      );
+    }
+  }
+
   private async assertLookupCode(
     lookupType: string,
     value: string,
@@ -577,11 +590,7 @@ export class CandidatesService {
       where: { id: dto.requirementId, deletedAt: null },
     });
     if (!req) throw new NotFoundException('Requirement not found');
-    if (req.status === 'CANCELLED' || req.status === 'CLOSED') {
-      throw new BadRequestException(
-        'Cannot add candidates to a Cancelled or Closed requirement',
-      );
-    }
+    this.assertRequirementAllowsRecruiting(req.status);
 
     const mobileNormalized = normalizeMobile(dto.mobile);
     const emailNormalized = normalizeEmail(dto.email);
@@ -668,6 +677,12 @@ export class CandidatesService {
       before.requirementId,
       actor,
     );
+
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: before.requirementId, deletedAt: null },
+    });
+    if (!req) throw new NotFoundException('Requirement not found');
+    this.assertRequirementAllowsRecruiting(req.status);
 
     const mobileNormalized = dto.mobile
       ? normalizeMobile(dto.mobile)
@@ -774,6 +789,11 @@ export class CandidatesService {
       before.requirementId,
       actor,
     );
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: before.requirementId, deletedAt: null },
+    });
+    if (!req) throw new NotFoundException('Requirement not found');
+    this.assertRequirementAllowsRecruiting(req.status);
     if (!selected && before.offer) {
       throw new BadRequestException(
         'Cannot unselect candidate with an existing offer',

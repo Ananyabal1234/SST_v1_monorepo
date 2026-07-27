@@ -116,26 +116,43 @@ export class UsersService {
     if (existing && !existing.deletedAt) {
       throw new ConflictException('Email already exists');
     }
+
     const passwordHash = await bcrypt.hash(dto.password, 10);
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        fullName: dto.fullName,
-        role: dto.role,
-        passwordHash,
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        isActive: true,
-      },
-    });
+    const select = {
+      id: true,
+      email: true,
+      fullName: true,
+      role: true,
+      isActive: true,
+    } as const;
+
+    // Soft-deleted emails still occupy the unique key — restore instead of insert.
+    const user = existing?.deletedAt
+      ? await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            fullName: dto.fullName,
+            role: dto.role,
+            passwordHash,
+            isActive: true,
+            deletedAt: null,
+          },
+          select,
+        })
+      : await this.prisma.user.create({
+          data: {
+            email,
+            fullName: dto.fullName,
+            role: dto.role,
+            passwordHash,
+          },
+          select,
+        });
+
     await this.audit.log({
       entityType: 'User',
       entityId: user.id,
-      action: 'CREATE',
+      action: existing?.deletedAt ? 'RESTORE' : 'CREATE',
       actorUserId: actorId,
       after: user,
     });
