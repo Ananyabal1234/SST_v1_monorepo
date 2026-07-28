@@ -754,6 +754,8 @@ export class OnboardingService {
   }
 
   private async notifyJoinedEmails(onboarding: {
+    id: string;
+    joinedNotifiedAt?: Date | null;
     actualDoj?: Date | null;
     candidate?: {
       name?: string | null;
@@ -765,6 +767,16 @@ export class OnboardingService {
     requirementId: string;
     requirement?: { publicId?: string | null; roleSkill?: string | null } | null;
   }): Promise<void> {
+    if (!onboarding?.id) return;
+    if (onboarding.joinedNotifiedAt) return;
+
+    // Claim the notify slot once so JOINED → IN_PROGRESS → JOINED does not re-mail.
+    const claimed = await this.prisma.onboarding.updateMany({
+      where: { id: onboarding.id, joinedNotifiedAt: null, deletedAt: null },
+      data: { joinedNotifiedAt: new Date() },
+    });
+    if (claimed.count === 0) return;
+
     const req = await this.prisma.requirement.findFirst({
       where: { id: onboarding.requirementId, deletedAt: null },
       include: {
