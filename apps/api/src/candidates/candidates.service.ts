@@ -16,6 +16,8 @@ import {
 } from './dto/candidates.dto';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { derivePipelineStage } from '../common/pipeline-stage';
+import { MailService } from '../mail/mail.service';
+import { hrCandidateSelectedEmail } from '../mail/templates';
 
 type StatusFields = {
   selected?: boolean;
@@ -61,6 +63,7 @@ export class CandidatesService {
     private readonly ids: IdSequenceService,
     private readonly offers: OffersService,
     private readonly requirements: RequirementsService,
+    private readonly mail: MailService,
   ) {}
 
   private isPublicId(id: string) {
@@ -133,6 +136,46 @@ export class CandidatesService {
       throw new BadRequestException(
         'Cannot modify candidates on a Cancelled or Closed requirement',
       );
+    }
+  }
+
+  private async notifyHrsCandidateSelected(candidateId: string): Promise<void> {
+    const candidate = await this.prisma.candidate.findFirst({
+      where: { id: candidateId, deletedAt: null },
+      include: {
+        requirement: {
+          select: {
+            publicId: true,
+            roleSkill: true,
+            client: { select: { name: true } },
+          },
+        },
+      },
+    });
+    if (!candidate) return;
+
+    const hrs = await this.prisma.user.findMany({
+      where: { role: Role.HR, isActive: true, deletedAt: null },
+      select: { email: true, fullName: true },
+    });
+
+    for (const hr of hrs) {
+      if (!hr.email) continue;
+      const msg = hrCandidateSelectedEmail({
+        hrName: hr.fullName || hr.email,
+        candidateName: candidate.name,
+        candidatePublicId: candidate.publicId,
+        requirementPublicId: candidate.requirement?.publicId || '—',
+        roleSkill: candidate.requirement?.roleSkill || '—',
+        clientName: candidate.requirement?.client?.name || '—',
+      });
+      void this.mail.send({
+        to: hr.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'candidate-selected-hr',
+      });
     }
   }
 
@@ -645,6 +688,7 @@ export class CandidatesService {
 
     if (row.selected) {
       await this.offers.ensureForSelectedCandidate(row.id, actor.id);
+      void this.notifyHrsCandidateSelected(row.id);
     }
 
     const refreshed = await this.prisma.candidate.findFirst({
@@ -762,6 +806,9 @@ export class CandidatesService {
     if (row.selected && !before.offer) {
       await this.offers.ensureForSelectedCandidate(row.id, actor.id);
     }
+    if (row.selected && !before.selected) {
+      void this.notifyHrsCandidateSelected(row.id);
+    }
 
     const refreshed = await this.prisma.candidate.findFirst({
       where: { id: row.id },
@@ -823,6 +870,9 @@ export class CandidatesService {
 
     if (selected) {
       await this.offers.ensureForSelectedCandidate(row.id, actor.id);
+      if (!before.selected) {
+        void this.notifyHrsCandidateSelected(row.id);
+      }
     }
 
     const refreshed = await this.prisma.candidate.findFirst({

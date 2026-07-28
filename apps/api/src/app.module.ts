@@ -13,11 +13,16 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { AuditModule } from './audit/audit.module';
 import { ImportModule } from './import/import.module';
 import { IdSequenceModule } from './id-sequence/id-sequence.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, envFilePath: ['.env', '../../.env'] }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '../../.env', '../.env'],
+    }),
     PrismaModule,
+    MailModule,
     IdSequenceModule,
     HealthModule,
     AuthModule,

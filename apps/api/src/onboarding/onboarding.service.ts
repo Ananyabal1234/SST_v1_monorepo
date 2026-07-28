@@ -16,6 +16,10 @@ import {
   CreateOnboardingDto,
   UpdateOnboardingDto,
 } from './dto/onboarding.dto';
+import { MailService } from '../mail/mail.service';
+import {
+  candidateJoinedEmail,
+} from '../mail/templates';
 
 @Injectable()
 export class OnboardingService {
@@ -26,6 +30,7 @@ export class OnboardingService {
     private readonly requirements: RequirementsService,
     @Inject(forwardRef(() => OffersService))
     private readonly offers: OffersService,
+    private readonly mail: MailService,
   ) {}
 
   private isPublicId(id: string) {
@@ -590,6 +595,15 @@ export class OnboardingService {
       where: { id: row.id },
       include: this.detailInclude,
     });
+
+    const enteredJoined =
+      nextStatus != null &&
+      this.isFilledStatus(nextStatus) &&
+      !this.isFilledStatus(current.statusCode);
+    if (enteredJoined) {
+      void this.notifyJoinedEmails(fresh ?? row);
+    }
+
     return this.mapOnboardingRow(fresh ?? row);
   }
 
@@ -727,6 +741,105 @@ export class OnboardingService {
       where: { id: row.id },
       include: this.detailInclude,
     });
+
+    const enteredJoined =
+      (nextStatus === 'JOINED' || nextStatus === 'COMPLETED') &&
+      before.statusCode !== 'JOINED' &&
+      before.statusCode !== 'COMPLETED';
+    if (enteredJoined) {
+      void this.notifyJoinedEmails(fresh ?? row);
+    }
+
     return this.mapOnboardingRow(fresh ?? row);
+  }
+
+  private async notifyJoinedEmails(onboarding: {
+    actualDoj?: Date | null;
+    candidate?: {
+      name?: string | null;
+      email?: string | null;
+      mobile?: string | null;
+      publicId?: string | null;
+    } | null;
+    hrOwner?: { fullName?: string | null; email?: string | null } | null;
+    requirementId: string;
+    requirement?: { publicId?: string | null; roleSkill?: string | null } | null;
+  }): Promise<void> {
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: onboarding.requirementId, deletedAt: null },
+      include: {
+        client: { select: { name: true } },
+        salesOwner: { select: { fullName: true, email: true } },
+        taAssignments: {
+          include: {
+            user: { select: { fullName: true, email: true } },
+          },
+        },
+        taOwner: { select: { fullName: true, email: true } },
+      },
+    });
+    if (!req) return;
+
+    const doj = onboarding.actualDoj
+      ? new Date(onboarding.actualDoj).toISOString().slice(0, 10)
+      : '—';
+    const candidateName = onboarding.candidate?.name || '—';
+    const publicId = req.publicId;
+    const roleSkill = req.roleSkill;
+
+    const taRecipients = req.taAssignments?.length
+      ? req.taAssignments.map((a) => a.user)
+      : req.taOwner
+        ? [req.taOwner]
+        : [];
+
+    const joined = await this.prisma.onboarding.count({
+      where: {
+        requirementId: req.id,
+        statusCode: { in: ['JOINED', 'COMPLETED'] },
+        deletedAt: null,
+      },
+    });
+
+    const recipients: Array<{ email: string; name: string }> = [];
+    if (req.salesOwner?.email) {
+      recipients.push({
+        email: req.salesOwner.email,
+        name: req.salesOwner.fullName || req.salesOwner.email,
+      });
+    }
+    for (const ta of taRecipients) {
+      if (!ta?.email) continue;
+      if (recipients.some((r) => r.email === ta.email)) continue;
+      recipients.push({
+        email: ta.email,
+        name: ta.fullName || ta.email,
+      });
+    }
+
+    for (const recipient of recipients) {
+      const msg = candidateJoinedEmail({
+        recipientName: recipient.name,
+        candidateName,
+        candidateEmail: onboarding.candidate?.email || '—',
+        candidateMobile: onboarding.candidate?.mobile || '—',
+        candidatePublicId: onboarding.candidate?.publicId || '—',
+        requirementPublicId: publicId,
+        roleSkill,
+        clientName: req.client?.name || '—',
+        doj,
+        hrOwnerName:
+          onboarding.hrOwner?.fullName || onboarding.hrOwner?.email || '—',
+        closedCount: joined,
+        totalPositions: req.numberOfPositions,
+      });
+      void this.mail.send({
+        to: recipient.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'candidate-joined',
+      });
+    }
   }
 }

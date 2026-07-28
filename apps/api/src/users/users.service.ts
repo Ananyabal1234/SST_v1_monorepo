@@ -8,6 +8,8 @@ import { Role } from '../prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from '../mail/mail.service';
+import { userCredentialsEmail } from '../mail/templates';
 import { CreateUserDto, UpdateUserDto } from './dto/users.dto';
 
 @Injectable()
@@ -15,6 +17,7 @@ export class UsersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly mail: MailService,
   ) {}
 
   async list(
@@ -156,6 +159,22 @@ export class UsersService {
       actorUserId: actorId,
       after: user,
     });
+
+    const creds = userCredentialsEmail({
+      fullName: dto.fullName,
+      email,
+      password: dto.password,
+      role: dto.role,
+      loginUrl: this.mail.loginUrl,
+    });
+    void this.mail.send({
+      to: email,
+      subject: creds.subject,
+      text: creds.text,
+      html: creds.html,
+      scenario: 'user-credentials',
+    });
+
     return user;
   }
 

@@ -19,6 +19,11 @@ import {
   derivePipelineStage,
   type PipelineStageCode,
 } from '../common/pipeline-stage';
+import { MailService } from '../mail/mail.service';
+import {
+  salesRequirementClosedEmail,
+  taAssignmentEmail,
+} from '../mail/templates';
 
 const requirementInclude = {
   client: true,
@@ -51,6 +56,7 @@ export class RequirementsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly ids: IdSequenceService,
+    private readonly mail: MailService,
   ) {}
 
   private isPublicId(id: string) {
@@ -197,6 +203,89 @@ export class RequirementsService {
       data: { taOwnerId: primaryId },
     });
     return primaryId;
+  }
+
+  private async notifyAssignedTas(
+    row: RequirementRow,
+    taUserIds: string[],
+  ): Promise<void> {
+    if (!taUserIds.length) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: taUserIds }, deletedAt: null },
+      select: { id: true, email: true, fullName: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+    for (const id of taUserIds) {
+      const ta = byId.get(id);
+      if (!ta?.email) continue;
+      const msg = taAssignmentEmail({
+        taName: ta.fullName || ta.email,
+        publicId: row.publicId,
+        clientName: row.client?.name || '—',
+        roleSkill: row.roleSkill,
+        numberOfPositions: row.numberOfPositions,
+        priorityCode: row.priorityCode,
+        salesOwnerName: row.salesOwner?.fullName || row.salesOwner?.email || '—',
+      });
+      void this.mail.send({
+        to: ta.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'ta-assignment',
+      });
+    }
+  }
+
+  private notifyRequirementClosed(row: {
+    id?: string;
+    publicId: string;
+    roleSkill: string;
+    numberOfPositions: number;
+    client?: { name: string } | null;
+    salesOwner?: { fullName: string; email: string } | null;
+    taOwner?: { fullName: string; email: string } | null;
+    taAssignments?: Array<{
+      user?: { fullName: string; email: string } | null;
+    }>;
+  }): void {
+    const recipients: Array<{ email: string; name: string }> = [];
+    if (row.salesOwner?.email) {
+      recipients.push({
+        email: row.salesOwner.email,
+        name: row.salesOwner.fullName || row.salesOwner.email,
+      });
+    }
+    const tas = row.taAssignments?.length
+      ? row.taAssignments.map((a) => a.user).filter(Boolean)
+      : row.taOwner
+        ? [row.taOwner]
+        : [];
+    for (const ta of tas) {
+      if (!ta?.email) continue;
+      if (recipients.some((r) => r.email === ta.email)) continue;
+      recipients.push({
+        email: ta.email,
+        name: ta.fullName || ta.email,
+      });
+    }
+
+    for (const recipient of recipients) {
+      const msg = salesRequirementClosedEmail({
+        recipientName: recipient.name,
+        publicId: row.publicId,
+        roleSkill: row.roleSkill,
+        clientName: row.client?.name || '—',
+        totalPositions: row.numberOfPositions,
+      });
+      void this.mail.send({
+        to: recipient.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'requirement-closed',
+      });
+    }
   }
 
   private async isAssignedTa(
@@ -601,6 +690,10 @@ export class RequirementsService {
       return refreshed ?? created;
     });
 
+    if (taOwnerIds.length) {
+      void this.notifyAssignedTas(row, taOwnerIds);
+    }
+
     return this.withDerived(row, 0);
   }
 
@@ -741,6 +834,10 @@ export class RequirementsService {
     if (payload.durationMonths !== undefined)
       data.durationMonths = payload.durationMonths;
 
+    const previousTaIds = new Set(
+      (before.taAssignments || []).map((a) => a.userId),
+    );
+
     const row = await this.prisma.$transaction(async (tx) => {
       await tx.requirement.update({
         where: { id: before.id },
@@ -766,6 +863,13 @@ export class RequirementsService {
       );
       return updated;
     });
+
+    if (nextTaOwnerIds) {
+      const newlyAdded = nextTaOwnerIds.filter((id) => !previousTaIds.has(id));
+      if (newlyAdded.length) {
+        void this.notifyAssignedTas(row, newlyAdded);
+      }
+    }
 
     const counts = await this.closedCounts([row.id]);
     return this.withDerived(row, counts.get(row.id) ?? 0);
@@ -819,6 +923,10 @@ export class RequirementsService {
       );
       return updated;
     });
+
+    if (status === 'CLOSED' && before.status !== 'CLOSED') {
+      this.notifyRequirementClosed(row);
+    }
 
     const counts = await this.closedCounts([row.id]);
     return this.withDerived(row, counts.get(row.id) ?? 0);
@@ -876,6 +984,24 @@ export class RequirementsService {
       },
       tx,
     );
+
+    if (nextStatus === 'CLOSED') {
+      const full = await client.requirement.findFirst({
+        where: { id: requirementId },
+        include: {
+          client: { select: { name: true } },
+          salesOwner: { select: { fullName: true, email: true } },
+          taOwner: { select: { fullName: true, email: true } },
+          taAssignments: {
+            include: {
+              user: { select: { fullName: true, email: true } },
+            },
+          },
+        },
+      });
+      if (full) this.notifyRequirementClosed(full);
+    }
+
     return updated;
   }
 }

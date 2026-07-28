@@ -26,6 +26,10 @@ Postgres is published on **host port 5433** (avoids clashes with other local Pos
 
 Admin login is created by `pnpm db:seed` using `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` from your `.env` (set these yourself; no default credentials are shipped).
 
+### Email (company SMTP)
+
+Set `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, and `APP_LOGIN_URL` in `.env` to enable transactional emails (user credentials, TA assignment, HR on select, TA/Sales on join/close). If `SMTP_HOST` is empty, the API skips sending and logs a debug message.
+
 ## Design tokens
 
 Palette lives in `apps/web/src/styles/index.css` (`:root` / `.dark`). Change CSS variables to retheme without touching components.
