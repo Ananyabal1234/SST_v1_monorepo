@@ -1,10 +1,9 @@
-// Reusable logo. Uses the organization's real logo (BR-Group-Logo.png) from /public.
+// Reusable BrickRed Group logo (sidebar + login).
 export default function Logo({ size = 40, className = '' }) {
   return (
     <img
       src="/BR-Group-Logo.png"
-      alt="BR Group Logo"
-      width={size}
+      alt="BrickRed Group Logo"
       height={size}
       className={`logo ${className}`}
     />

@@ -36,7 +36,7 @@ import { OnboardingsQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Onboardings')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.HR)
+@Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
 @Controller('onboardings')
 export class OnboardingController {
   constructor(private readonly onboarding: OnboardingService) {}
@@ -64,11 +64,11 @@ export class OnboardingController {
     return this.onboarding.get(id);
   }
 
-  @Roles(Role.ADMIN, Role.HR)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
   @Post()
   @ApiOperation({
     operationId: 'createOnboarding',
-    summary: 'Create onboarding from accepted offer (HR/Admin)',
+    summary: 'Create onboarding from accepted offer (HR/HR Lead/Admin)',
   })
   @ApiCreatedResponse({ description: 'Created onboarding' })
   @ApiMutateErrors()
@@ -76,11 +76,11 @@ export class OnboardingController {
     return this.onboarding.create(dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.HR)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateOnboarding',
-    summary: 'Update onboarding (HR/Admin)',
+    summary: 'Update onboarding (HR/HR Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (ONB-00001)' })
   @ApiOkResponse({ description: 'Updated onboarding' })
@@ -93,11 +93,11 @@ export class OnboardingController {
     return this.onboarding.update(id, dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.HR)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
   @Post(':id/status')
   @ApiOperation({
     operationId: 'setOnboardingStatus',
-    summary: 'Transition onboarding status / Joined (HR/Admin)',
+    summary: 'Transition onboarding status / Joined (HR/HR Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (ONB-00001)' })
   @ApiOkResponse({ description: 'Updated onboarding' })

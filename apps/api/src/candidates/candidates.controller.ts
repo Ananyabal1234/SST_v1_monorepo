@@ -37,13 +37,13 @@ import { CandidatesQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Candidates')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
+@Roles(Role.ADMIN, Role.TA, Role.TA_LEAD, Role.SALES, Role.SALES_LEAD, Role.HR, Role.HR_LEAD)
 @Controller('candidates')
 export class CandidatesController {
   constructor(private readonly candidates: CandidatesService) {}
 
   @Get()
-  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD, Role.SALES, Role.SALES_LEAD, Role.HR, Role.HR_LEAD)
   @ApiOperation({
     operationId: 'listCandidates',
     summary: 'List candidates with filters',
@@ -58,10 +58,10 @@ export class CandidatesController {
   }
 
   @Get('duplicates')
-  @Roles(Role.ADMIN, Role.TA)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD)
   @ApiOperation({
     operationId: 'lookupDuplicateCandidates',
-    summary: 'Lookup prior candidate rows by email or mobile (TA/Admin)',
+    summary: 'Lookup prior candidate rows by email or mobile (TA/TA Lead/Admin)',
   })
   @ApiOkResponse({ description: 'Duplicate candidate history' })
   @ApiProtectedErrors()
@@ -74,7 +74,7 @@ export class CandidatesController {
   }
 
   @Get(':id')
-  @Roles(Role.ADMIN, Role.TA, Role.SALES, Role.HR)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD, Role.SALES, Role.SALES_LEAD, Role.HR, Role.HR_LEAD)
   @ApiOperation({
     operationId: 'getCandidate',
     summary: 'Candidate detail including duplicate flags',
@@ -86,11 +86,11 @@ export class CandidatesController {
     return this.candidates.get(id);
   }
 
-  @Roles(Role.ADMIN, Role.TA)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD)
   @Post()
   @ApiOperation({
     operationId: 'createCandidate',
-    summary: 'Create candidate (TA/Admin)',
+    summary: 'Create candidate (TA/TA Lead/Admin)',
   })
   @ApiCreatedResponse({ description: 'Created candidate' })
   @ApiMutateErrors()
@@ -98,11 +98,11 @@ export class CandidatesController {
     return this.candidates.create(dto, user);
   }
 
-  @Roles(Role.ADMIN, Role.TA)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateCandidate',
-    summary: 'Update candidate (TA/Admin)',
+    summary: 'Update candidate (TA/TA Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (CAN-00001)' })
   @ApiOkResponse({ description: 'Updated candidate' })
@@ -115,11 +115,11 @@ export class CandidatesController {
     return this.candidates.update(id, dto, user);
   }
 
-  @Roles(Role.ADMIN, Role.TA)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD)
   @Post(':id/select')
   @ApiOperation({
     operationId: 'selectCandidate',
-    summary: 'Mark candidate selected / unselected (TA/Admin)',
+    summary: 'Mark candidate selected / unselected (TA/TA Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (CAN-00001)' })
   @ApiOkResponse({ description: 'Updated candidate' })

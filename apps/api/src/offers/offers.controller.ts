@@ -39,7 +39,7 @@ import {
 @ApiTags('Offers')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.HR, Role.TA)
+@Roles(Role.ADMIN, Role.HR, Role.HR_LEAD, Role.TA, Role.TA_LEAD)
 @Controller('offers')
 export class OffersController {
   constructor(private readonly offers: OffersService) {}
@@ -78,11 +78,11 @@ export class OffersController {
     return this.offers.get(id);
   }
 
-  @Roles(Role.ADMIN, Role.HR, Role.TA)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD, Role.TA, Role.TA_LEAD)
   @Post()
   @ApiOperation({
     operationId: 'createOffer',
-    summary: 'Create offer for selected candidate (HR/TA/Admin)',
+    summary: 'Create offer for selected candidate (HR/HR Lead/TA/TA Lead/Admin)',
   })
   @ApiCreatedResponse({ description: 'Created offer' })
   @ApiMutateErrors()
@@ -90,11 +90,11 @@ export class OffersController {
     return this.offers.create(dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.HR)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateOffer',
-    summary: 'Update offer dates / CTC (HR/Admin)',
+    summary: 'Update offer dates / CTC (HR/HR Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (OFF-00001)' })
   @ApiOkResponse({ description: 'Updated offer' })
@@ -107,11 +107,11 @@ export class OffersController {
     return this.offers.update(id, dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.HR)
+  @Roles(Role.ADMIN, Role.HR, Role.HR_LEAD)
   @Post(':id/status')
   @ApiOperation({
     operationId: 'setOfferStatus',
-    summary: 'Transition offer status (HR/Admin)',
+    summary: 'Transition offer status (HR/HR Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (OFF-00001)' })
   @ApiOkResponse({ description: 'Updated offer' })

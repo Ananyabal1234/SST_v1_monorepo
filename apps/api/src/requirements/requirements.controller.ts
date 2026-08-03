@@ -37,7 +37,15 @@ import { RequirementsQueryDto } from '../common/swagger/query.dto';
 @ApiTags('Requirements')
 @ApiBearerAuth('bearer')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.SALES, Role.TA, Role.HR)
+@Roles(
+  Role.ADMIN,
+  Role.SALES,
+  Role.SALES_LEAD,
+  Role.TA,
+  Role.TA_LEAD,
+  Role.HR,
+  Role.HR_LEAD,
+)
 @Controller('requirements')
 export class RequirementsController {
   constructor(private readonly requirements: RequirementsService) {}
@@ -49,15 +57,19 @@ export class RequirementsController {
   })
   @ApiOkResponse({ description: 'Paginated requirements' })
   @ApiProtectedErrors()
-  list(@Query() query: RequirementsQueryDto, @CurrentUser() user: AuthUser): Promise<any> {
+  list(
+    @Query() query: RequirementsQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
     return this.requirements.list(query as Record<string, string>, user);
   }
 
   @Get(':id/pipeline')
-  @Roles(Role.ADMIN, Role.SALES, Role.TA)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD, Role.TA, Role.TA_LEAD)
   @ApiOperation({
     operationId: 'getRequirementPipeline',
-    summary: 'Candidate pipeline board for a requirement (Sales own / TA / Admin)',
+    summary:
+      'Candidate pipeline board for a requirement (Sales / Sales Lead / TA / TA Lead / Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
   @ApiOkResponse({ description: 'Requirement + candidates with pipelineStage' })
@@ -81,40 +93,45 @@ export class RequirementsController {
     return this.requirements.get(id);
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Post()
   @ApiOperation({
     operationId: 'createRequirement',
-    summary: 'Create requirement (Sales/Admin)',
+    summary:
+      'Create requirement (Sales/Sales Lead/Admin); TA assignment is done by TA Lead',
   })
   @ApiCreatedResponse({ description: 'Created requirement' })
   @ApiMutateErrors()
-  create(@Body() dto: CreateRequirementDto, @CurrentUser() user: AuthUser): Promise<any> {
+  create(
+    @Body() dto: CreateRequirementDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
     return this.requirements.create(dto, user);
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Put(':id')
   @ApiOperation({
     operationId: 'replaceRequirement',
-    summary: 'Replace requirement intake fields (Sales/Admin; full body)',
+    summary: 'Replace requirement intake fields (Sales/Sales Lead/Admin; full body)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
   @ApiOkResponse({ description: 'Updated requirement' })
   @ApiMutateErrors()
- replace(
-  @Param('id') id: string,
-  @Body() dto: CreateRequirementDto,
-  @CurrentUser() user: AuthUser,
-): Promise<any> {
-  return this.requirements.replace(id, dto, user);
-}
+  replace(
+    @Param('id') id: string,
+    @Body() dto: CreateRequirementDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
+    return this.requirements.replace(id, dto, user);
+  }
 
-  @Roles(Role.ADMIN, Role.SALES, Role.TA)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD, Role.TA, Role.TA_LEAD)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateRequirement',
-    summary: 'Partial update (TA limited fields; prefer PUT for Sales full edit)',
+    summary:
+      'Partial update (TA Lead assigns TAs; Sales Lead may reassign sales owner)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
   @ApiOkResponse({ description: 'Updated requirement' })
@@ -127,11 +144,11 @@ export class RequirementsController {
     return this.requirements.update(id, dto, user);
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Post(':id/status')
   @ApiOperation({
     operationId: 'setRequirementStatus',
-    summary: 'Transition requirement status (Sales/Admin)',
+    summary: 'Transition requirement status (Sales/Sales Lead/Admin)',
   })
   @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
   @ApiOkResponse({ description: 'Updated requirement' })

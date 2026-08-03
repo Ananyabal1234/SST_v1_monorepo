@@ -1,0 +1,63 @@
+name: sst-v1
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sst-v1-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sst
+      POSTGRES_PASSWORD: sst
+      POSTGRES_DB: sst
+    ports:
+      - "5433:5432"
+    volumes:
+      - sst_v1_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sst -d sst"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - sst_v1_net
+
+  api:
+    image: sst-api:1.0.0
+    build:
+      context: ..
+      dockerfile: docker/api.Dockerfile
+    container_name: sst-v1-api
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      DATABASE_URL: postgresql://sst:sst@postgres:5432/sst?schema=public
+      PORT: "3000"
+    ports:
+      - "${API_HOST_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - sst_v1_net
+
+  web:
+    image: sst-web:1.0.0
+    build:
+      context: ..
+      dockerfile: docker/web.Dockerfile
+    container_name: sst-v1-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - sst_v1_net
+
+volumes:
+  sst_v1_pg_data:
+
+networks:
+  sst_v1_net:
+    name: sst_v1_net

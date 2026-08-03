@@ -228,6 +228,79 @@ export function salesRequirementClosedEmail(opts: {
   return { subject, text, html };
 }
 
+export function requirementCreatedEmail(opts: {
+  recipientName: string;
+  roleLabel: string;
+  publicId: string;
+  clientName: string;
+  roleSkill: string;
+  numberOfPositions: number;
+  priorityCode: string;
+  salesOwnerName: string;
+}): { subject: string; text: string; html: string } {
+  const subject = `New requirement: ${opts.publicId}`;
+  const text = [
+    `Hello ${opts.recipientName},`,
+    '',
+    `A new requirement has been created (${opts.roleLabel}).`,
+    `Requirement: ${opts.publicId}`,
+    `Client: ${opts.clientName}`,
+    `Role / Skill: ${opts.roleSkill}`,
+    `Positions: ${opts.numberOfPositions}`,
+    `Priority: ${opts.priorityCode}`,
+    `Sales owner: ${opts.salesOwnerName}`,
+  ].join('\n');
+  const html = `
+    <p>Hello <strong>${escapeHtml(opts.recipientName)}</strong>,</p>
+    <p>A new requirement has been created (<strong>${escapeHtml(opts.roleLabel)}</strong>).</p>
+    <ul>
+      <li><strong>Requirement:</strong> ${escapeHtml(opts.publicId)}</li>
+      <li><strong>Client:</strong> ${escapeHtml(opts.clientName)}</li>
+      <li><strong>Role / Skill:</strong> ${escapeHtml(opts.roleSkill)}</li>
+      <li><strong>Positions:</strong> ${opts.numberOfPositions}</li>
+      <li><strong>Priority:</strong> ${escapeHtml(opts.priorityCode)}</li>
+      <li><strong>Sales owner:</strong> ${escapeHtml(opts.salesOwnerName)}</li>
+    </ul>
+  `;
+  return { subject, text, html };
+}
+
+export function taLeadAssignmentEmail(opts: {
+  leadName: string;
+  publicId: string;
+  clientName: string;
+  roleSkill: string;
+  numberOfPositions: number;
+  priorityCode: string;
+  salesOwnerName: string;
+}): { subject: string; text: string; html: string } {
+  const subject = `Requirement awaiting TA assignment: ${opts.publicId}`;
+  const text = [
+    `Hello ${opts.leadName},`,
+    '',
+    'You have been assigned as TA Lead on a requirement. Please assign TA owner(s).',
+    `Requirement: ${opts.publicId}`,
+    `Client: ${opts.clientName}`,
+    `Role / Skill: ${opts.roleSkill}`,
+    `Positions: ${opts.numberOfPositions}`,
+    `Priority: ${opts.priorityCode}`,
+    `Sales owner: ${opts.salesOwnerName}`,
+  ].join('\n');
+  const html = `
+    <p>Hello <strong>${escapeHtml(opts.leadName)}</strong>,</p>
+    <p>You have been assigned as <strong>TA Lead</strong> on a requirement. Please assign TA owner(s).</p>
+    <ul>
+      <li><strong>Requirement:</strong> ${escapeHtml(opts.publicId)}</li>
+      <li><strong>Client:</strong> ${escapeHtml(opts.clientName)}</li>
+      <li><strong>Role / Skill:</strong> ${escapeHtml(opts.roleSkill)}</li>
+      <li><strong>Positions:</strong> ${opts.numberOfPositions}</li>
+      <li><strong>Priority:</strong> ${escapeHtml(opts.priorityCode)}</li>
+      <li><strong>Sales owner:</strong> ${escapeHtml(opts.salesOwnerName)}</li>
+    </ul>
+  `;
+  return { subject, text, html };
+}
+
 function escapeHtml(value: string): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')

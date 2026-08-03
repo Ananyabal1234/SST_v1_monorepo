@@ -25,6 +25,12 @@ const FALLBACK_ROUNDS = [
   { code: 'COMPLETED', label: 'Completed' },
 ];
 
+const LOI_OPTIONS = [
+  { value: 'NOT_RECEIVED', label: 'Not Received' },
+  { value: 'RECEIVED', label: 'Received' },
+  { value: 'NOT_APPLICABLE', label: 'Not Applicable' },
+];
+
 // Columns shown in the candidate table (editable on the same screen).
 const CANDIDATE_FIELDS = [
   { key: 'candidateId', label: 'Candidate ID', type: 'text', required: false, locked: true, hideOnAdd: true },
@@ -37,13 +43,16 @@ const CANDIDATE_FIELDS = [
   { key: 'source', label: 'Source', type: 'text', required: true },
   { key: 'candidateStage', label: 'Candidate Stage', type: 'select', required: true, optionsKey: 'candidateStages' },
   { key: 'feedbackStatus', label: 'Candidate Status', type: 'select', required: true, optionsKey: 'candidateStatuses' },
+  { key: 'loiStatus', label: 'LOI', type: 'select', required: false, optionsKey: 'loiStatuses', onlyWhenSelected: true },
   { key: 'profileSubmittedDate', label: 'Profile Submitted Date', type: 'date', required: true },
   { key: 'clientShortlistDate', label: 'Client Shortlist Date', type: 'date', required: false },
   { key: 'interviewRound', label: 'Interview Round', type: 'select', required: false, optionsKey: 'interviewRounds' },
   { key: 'remarks', label: 'Remarks', type: 'text', required: false },
 ];
 
-const EMPTY_CANDIDATE = Object.fromEntries(CANDIDATE_FIELDS.map((f) => [f.key, '']));
+const EMPTY_CANDIDATE = Object.fromEntries(
+  CANDIDATE_FIELDS.map((f) => [f.key, f.key === 'loiStatus' ? 'NOT_RECEIVED' : '']),
+);
 
 function normalizeLookupList(res) {
   const list = Array.isArray(res) ? res : res?.items || res?.data || [];
@@ -147,8 +156,14 @@ export default function AssignTaskScreen() {
         // Map the requirements API response into the task-card shape used below.
         const mapped = reqList
           .filter((r) => {
-            // TA / Admin recruit across all requirements; Sales (if ever here) only own.
-            if (user?.userType === 'ta_owner' || user?.userType === 'admin') return true;
+            // Admin / TA Lead: all requirements. TA Owner: server already scopes to assigned.
+            if (
+              user?.userType === 'admin' ||
+              user?.userType === 'ta_owner' ||
+              user?.userType === 'ta_lead'
+            ) {
+              return true;
+            }
             const currentEmail = user?.email?.toLowerCase?.();
             const ownerEmail = r.salesOwner?.email?.toLowerCase?.();
             return !currentEmail || !ownerEmail || currentEmail === ownerEmail;
@@ -190,6 +205,7 @@ export default function AssignTaskScreen() {
                 source: c.source,
                 candidateStage: c.stageCode,
                 feedbackStatus: c.candidateStatus,
+                loiStatus: c.loiStatus || 'NOT_RECEIVED',
                 profileSubmittedDate: (c.profileSubmittedDate || '').slice(0, 10),
                 clientShortlistDate: (c.clientShortlistDate || '').slice(0, 10),
                 interviewRound: c.interviewRound || '',
@@ -279,6 +295,7 @@ export default function AssignTaskScreen() {
       source: cand.source || '',
       candidateStage: cand.stageCode || cand.candidateStage || 'SUBMITTED_TO_SPOC',
       feedbackStatus: cand.candidateStatus || cand.feedbackStatus || 'Pending',
+      loiStatus: cand.loiStatus || 'NOT_RECEIVED',
       profileSubmittedDate: (cand.profileSubmittedDate || '').toString().slice(0, 10),
       clientShortlistDate: (cand.clientShortlistDate || '').toString().slice(0, 10),
       interviewRound: cand.interviewRound || '',
@@ -314,9 +331,26 @@ export default function AssignTaskScreen() {
   const openCandidateDetails = (candidate) => setViewingCandidate(candidate);
   const closeCandidateDetails = () => setViewingCandidate(null);
 
-  const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const update = (key, value) => {
+    setForm((f) => {
+      const next = { ...f, [key]: value };
+      if (key === 'feedbackStatus') {
+        const selected = String(value).trim().toLowerCase() === 'selected';
+        if (selected && !f.loiStatus) next.loiStatus = 'NOT_RECEIVED';
+        if (!selected) next.loiStatus = 'NOT_RECEIVED';
+      }
+      return next;
+    });
+  };
 
-  const formFields = CANDIDATE_FIELDS.filter((f) => editing || !f.hideOnAdd);
+  const isSelectedStatus =
+    String(form.feedbackStatus || '').trim().toLowerCase() === 'selected';
+
+  const formFields = CANDIDATE_FIELDS.filter((f) => {
+    if (!editing && f.hideOnAdd) return false;
+    if (f.onlyWhenSelected && !isSelectedStatus) return false;
+    return true;
+  });
 
   const resolveSelectOptions = (f) => {
     if (f.optionsKey === 'candidateStatuses') {
@@ -327,6 +361,9 @@ export default function AssignTaskScreen() {
     }
     if (f.optionsKey === 'interviewRounds') {
       return interviewRounds.map((r) => ({ value: r.code, label: r.label }));
+    }
+    if (f.optionsKey === 'loiStatuses') {
+      return LOI_OPTIONS;
     }
     return [];
   };
@@ -350,6 +387,9 @@ export default function AssignTaskScreen() {
       jobFamily: form.jobFamily || null,
       stageCode: form.candidateStage || 'SUBMITTED_TO_SPOC',
       candidateStatus: form.feedbackStatus,
+      ...(String(form.feedbackStatus || '').trim().toLowerCase() === 'selected'
+        ? { loiStatus: form.loiStatus || 'NOT_RECEIVED' }
+        : {}),
       profileSubmittedDate: form.profileSubmittedDate || null,
       clientShortlistDate: form.clientShortlistDate || null,
       interviewRound: form.interviewRound || null,
@@ -378,6 +418,7 @@ export default function AssignTaskScreen() {
                   source: form.source,
                   candidateStage: form.candidateStage,
                   feedbackStatus: form.feedbackStatus,
+                  loiStatus: form.loiStatus || 'NOT_RECEIVED',
                   profileSubmittedDate: form.profileSubmittedDate,
                   clientShortlistDate: form.clientShortlistDate,
                   interviewRound: form.interviewRound,
@@ -408,10 +449,11 @@ export default function AssignTaskScreen() {
           source: form.source,
           candidateStage: form.candidateStage,
           feedbackStatus: form.feedbackStatus,
+          loiStatus: res?.candidate?.loiStatus || form.loiStatus || 'NOT_RECEIVED',
           profileSubmittedDate: form.profileSubmittedDate,
           clientShortlistDate: form.clientShortlistDate,
           interviewRound: form.interviewRound,
-          remarks: form.remarks,
+                  remarks: form.remarks,
         };
         setTasks((prev) => prev.map((t) =>
           t.id === form.requirementId ? { ...t, candidates: [...t.candidates, newCand] } : t
@@ -537,6 +579,7 @@ export default function AssignTaskScreen() {
                     candidateName: c.name,
                     candidateStage: c.stageCode,
                     feedbackStatus: c.candidateStatus,
+                    loiStatus: c.loiStatus || 'NOT_RECEIVED',
                     reqId: selectedTask.publicId,
                     position: selectedTask.position,
                     jobFamily: selectedTask.jobFamily,
@@ -567,6 +610,17 @@ export default function AssignTaskScreen() {
                             display = stageLabel(c[f.key], candidateStages);
                           } else if (f.key === 'interviewRound' && c[f.key]) {
                             display = roundLabel(c[f.key], interviewRounds);
+                          } else if (f.key === 'loiStatus') {
+                            const selected =
+                              String(c.feedbackStatus || '').trim().toLowerCase() === 'selected';
+                            if (!selected) {
+                              display = '—';
+                            } else {
+                              display =
+                                LOI_OPTIONS.find((o) => o.value === c.loiStatus)?.label ||
+                                c.loiStatus ||
+                                'Not Received';
+                            }
                           }
                           return (
                             <td key={f.key}>{display}</td>
@@ -605,6 +659,11 @@ export default function AssignTaskScreen() {
                         <div className="detail-field"><span className="detail-label">Source</span><input value={viewingCandidate.source || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Candidate Stage</span><input value={stageLabel(viewingCandidate.candidateStage, candidateStages)} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Candidate Status</span><input value={viewingCandidate.feedbackStatus || ''} readOnly /></div>
+                        <div className="detail-field"><span className="detail-label">LOI</span><input value={
+                          String(viewingCandidate.feedbackStatus || '').trim().toLowerCase() === 'selected'
+                            ? (LOI_OPTIONS.find((o) => o.value === viewingCandidate.loiStatus)?.label || viewingCandidate.loiStatus || 'Not Received')
+                            : '—'
+                        } readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Profile Submitted</span><input value={viewingCandidate.profileSubmittedDate || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Client Shortlist Date</span><input value={viewingCandidate.clientShortlistDate || ''} readOnly /></div>
                         <div className="detail-field"><span className="detail-label">Interview Round</span><input value={roundLabel(viewingCandidate.interviewRound, interviewRounds)} readOnly /></div>

@@ -130,4 +130,6 @@ Severity: S1 blocker (auth/data loss) → S4 cosmetic.
 ## References
 
 - [TEST_STRUCTURE_AND_COVERAGE.md](./TEST_STRUCTURE_AND_COVERAGE.md)  
+- [v1-catalog/README.md](./v1-catalog/README.md) — Must FR + 7-role manual catalog  
+- [v1-catalog/af-suites/README.md](./v1-catalog/af-suites/README.md) — Full A–F automated suite index  
 - [../01-business-analysis/BUSINESS_RULES.md](../01-business-analysis/BUSINESS_RULES.md)  

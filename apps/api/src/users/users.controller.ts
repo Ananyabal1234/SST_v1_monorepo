@@ -40,8 +40,11 @@ export class UsersController {
   @Roles(
     Role.ADMIN,
     Role.SALES,
+    Role.SALES_LEAD,
     Role.TA,
+    Role.TA_LEAD,
     Role.HR,
+    Role.HR_LEAD,
   )
   @Get('directory')
   @ApiOperation({

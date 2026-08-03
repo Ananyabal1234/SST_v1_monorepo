@@ -37,6 +37,7 @@ export const ENDPOINTS = {
   CLIENTS: '/api/v1/master-data/clients',            // GET -> [{ id, name, ... }]
   SALES_MEMBERS: '/api/v1/master-data/sales-members', // GET -> [{ id, fullName, email, role }]
   TA_MEMBERS: '/api/v1/master-data/ta-members',       // GET -> [{ id, fullName, email, role }]
+  TA_LEAD_MEMBERS: '/api/v1/master-data/ta-lead-members', // GET -> [{ id, fullName, email, role }]
   CANDIDATE_STATUS: '/api/v1/master-data/candidate-status', // GET -> ["Selected","Rejected","Pending"]
   LOOKUPS: '/api/v1/master-data/lookups', // GET /api/v1/master-data/lookups/{type} -> lookup values (e.g. OFFER_STATUS)
   USERS: '/api/v1/users',                            // GET list | POST create | PATCH/DELETE /{id}

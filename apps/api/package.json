@@ -5,10 +5,12 @@
   "scripts": {
     "dev": "pnpm exec tsc -p tsconfig.json && nest start --watch",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "node dist/src/main.js",
     "lint": "echo \"no lint\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "echo \"Use packages/shared-utils and shared-types vitest; see requirement-intake.e2e.checklist.ts\"",
+    "test": "vitest run --config vitest.integration.config.ts",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:catalog": "node test/manual/run-v1-catalog.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
@@ -41,6 +43,7 @@
   "devDependencies": {
     "@nestjs/cli": "^11.0.7",
     "@nestjs/schematics": "^11.0.5",
+    "@nestjs/testing": "^11.1.28",
     "@sst/typescript-config": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "@types/cookie-parser": "^1.4.9",
@@ -49,9 +52,12 @@
     "@types/node": "^22.20.1",
     "@types/nodemailer": "^8.0.1",
     "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^6.0.3",
     "prisma": "^6.10.1",
+    "supertest": "^7.2.2",
     "tsx": "^4.20.3",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.7"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

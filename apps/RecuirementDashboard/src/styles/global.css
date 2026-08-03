@@ -137,6 +137,7 @@ body {
   object-fit: contain; display: block;
 }
 .sidebar-brand img { filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
+[data-theme='dark'] .sidebar-brand img { filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)); }
 
 .detail-offer-block {
   margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
@@ -338,6 +339,62 @@ body {
 .ta-multi-option.is-selected { background: var(--brand-tint); font-weight: 600; }
 .ta-multi-option input { margin: 0; }
 .ta-multi-empty { font-size: 12px; color: var(--text-soft); padding: 8px 0; }
+
+.assign-mode-block {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.assign-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assign-mode-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  background: var(--surface, #fff);
+}
+.assign-mode-opt.is-active {
+  border-color: var(--primary);
+  background: var(--brand-tint, #f0f7ff);
+  font-weight: 600;
+}
+.assign-mode-select { max-width: 480px; }
+
+.password-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.password-field input {
+  width: 100%;
+  padding-right: 40px;
+}
+.password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--text-soft, #6b7280);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.password-toggle:hover { color: var(--primary, #2563eb); }
 .theme-toggle {
   display: flex; align-items: center; gap: 8px; padding: 9px 14px; border: 1px solid var(--border);
   background: var(--bg-soft); color: var(--text); border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer;

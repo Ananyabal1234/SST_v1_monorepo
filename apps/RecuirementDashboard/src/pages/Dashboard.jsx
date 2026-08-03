@@ -23,27 +23,42 @@ import OffersScreen from './roles/OffersScreen';
 import UsersScreen from './roles/UsersScreen';
 import YourRequirementsScreen from './roles/YourRequirementsScreen';
 import MyTasksScreen from './roles/MyTasksScreen';
+import TaLeadAssignScreen from './roles/TaLeadAssignScreen';
 
 // Map each user type to the screen component it can visit.
 // (Admin has no dedicated tab — "Add request" replaces it.)
 const ROLE_SCREENS = {
   sales: { label: 'Sales', Component: SalesScreen },
+  sales_lead: { label: 'Sales Lead', Component: SalesScreen },
   ta_owner: { label: 'TA Owner', Component: TaOwnerScreen },
+  ta_lead: { label: 'TA Lead', Component: TaOwnerScreen },
   hr: { label: 'HR', Component: HrScreen },
+  hr_lead: { label: 'HR Lead', Component: HrScreen },
   onboarding: { label: 'Onboarding', Component: OnboardingScreen },
 };
 
 // Which secondary tab(s) each user type sees, alongside the Dashboard.
-// sales -> Add Request, ta_owner -> Assign Task, hr -> HR candidates.
-// admin/onboarding fall back to seeing all secondary tabs.
 const SECONDARY_TABS = {
   sales: [
     { key: 'add', label: 'Add Request', icon: IconPlus },
     { key: 'your', label: 'Requirements', icon: IconList },
     { key: 'mytasks', label: 'Task History', icon: IconUsers },
   ],
+  sales_lead: [
+    { key: 'add', label: 'Add Request', icon: IconPlus },
+    { key: 'your', label: 'Requirements', icon: IconList },
+    { key: 'mytasks', label: 'Task History', icon: IconUsers },
+  ],
   ta_owner: [{ key: 'assign', label: 'Assign Task', icon: IconClipboardCheck }],
+  ta_lead: [
+    { key: 'lead-assign', label: 'Requirements & Pipeline', icon: IconList },
+    { key: 'assign', label: 'Assign Task', icon: IconClipboardCheck },
+  ],
   hr: [
+    { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
+    { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
+  ],
+  hr_lead: [
     { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
     { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
   ],
@@ -409,7 +424,7 @@ export default function Dashboard() {
       <main className="main">
         <header className="topbar">
           <div className="topbar-title">
-            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'users' ? 'Users' : `${roleScreen?.label} Workspace`}</h1>
+            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'lead-assign' ? 'Assign Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'users' ? 'Users' : `${roleScreen?.label} Workspace`}</h1>
             <span className="role-pill">{USER_TYPE_LABELS[userType]}</span>
           </div>
           <div className="topbar-meta">
@@ -464,6 +479,8 @@ export default function Dashboard() {
         ) : activeTab === 'your' ? (
           // List of requirements the user has added
           <YourRequirementsScreen />
+        ) : activeTab === 'lead-assign' ? (
+          <TaLeadAssignScreen />
         ) : activeTab === 'assign' ? (
           // Assign task screen
           <AssignTaskScreen />

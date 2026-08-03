@@ -59,11 +59,11 @@ export class MasterDataController {
     return this.master.listLookups(type);
   }
 
-  @Roles(Role.ADMIN, Role.TA)
+  @Roles(Role.ADMIN, Role.TA, Role.TA_LEAD)
   @Get('candidate-status')
   @ApiOperation({
     operationId: 'listCandidateStatus',
-    summary: 'List candidate statuses (TA/Admin)',
+    summary: 'List candidate statuses (TA/TA Lead/Admin)',
   })
   @ApiOkResponse({
     description: 'Candidate status labels',
@@ -121,11 +121,11 @@ export class MasterDataController {
     return this.master.listClients();
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Post('clients')
   @ApiOperation({
     operationId: 'createClient',
-    summary: 'Create client (Admin/Sales)',
+    summary: 'Create client (Admin/Sales/Sales Lead)',
   })
   @ApiCreatedResponse({ description: 'Created or existing client' })
   @ApiMutateErrors()
@@ -133,11 +133,11 @@ export class MasterDataController {
     return this.master.createClient(dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Patch('clients/:id')
   @ApiOperation({
     operationId: 'updateClient',
-    summary: 'Update client (Admin/Sales)',
+    summary: 'Update client (Admin/Sales/Sales Lead)',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ description: 'Updated client' })
@@ -161,11 +161,11 @@ export class MasterDataController {
     return this.master.listJobFamilies();
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Post('job-families')
   @ApiOperation({
     operationId: 'createJobFamily',
-    summary: 'Create job family (Admin/Sales)',
+    summary: 'Create job family (Admin/Sales/Sales Lead)',
   })
   @ApiCreatedResponse({ description: 'Created or existing job family' })
   @ApiMutateErrors()
@@ -176,11 +176,11 @@ export class MasterDataController {
     return this.master.createJobFamily(dto, user.id);
   }
 
-  @Roles(Role.ADMIN, Role.SALES)
+  @Roles(Role.ADMIN, Role.SALES, Role.SALES_LEAD)
   @Patch('job-families/:id')
   @ApiOperation({
     operationId: 'updateJobFamily',
-    summary: 'Update job family (Admin/Sales)',
+    summary: 'Update job family (Admin/Sales/Sales Lead)',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ description: 'Updated job family' })
@@ -198,12 +198,23 @@ export class MasterDataController {
   @Get('ta-members')
   @ApiOperation({
     operationId: 'listTaMembers',
-    summary: 'List TA members',
+    summary: 'List TA members (assignable owners)',
   })
   @ApiOkResponse({ description: 'Active TA users' })
   @ApiProtectedErrors()
   listTaMembers() {
-    return this.master.listMembers(Role.TA);
+    return this.master.listMembersByRoles([Role.TA]);
+  }
+
+  @Get('ta-lead-members')
+  @ApiOperation({
+    operationId: 'listTaLeadMembers',
+    summary: 'List TA Lead members (assignable leads)',
+  })
+  @ApiOkResponse({ description: 'Active TA Lead users' })
+  @ApiProtectedErrors()
+  listTaLeadMembers() {
+    return this.master.listMembersByRoles([Role.TA_LEAD]);
   }
 
   @Roles(Role.ADMIN)
@@ -224,12 +235,12 @@ export class MasterDataController {
   @Get('sales-members')
   @ApiOperation({
     operationId: 'listSalesMembers',
-    summary: 'List Sales members',
+    summary: 'List Sales and Sales Lead members (assignable owners)',
   })
-  @ApiOkResponse({ description: 'Active Sales users' })
+  @ApiOkResponse({ description: 'Active Sales / Sales Lead users' })
   @ApiProtectedErrors()
   listSalesMembers() {
-    return this.master.listMembers(Role.SALES);
+    return this.master.listMembersByRoles([Role.SALES, Role.SALES_LEAD]);
   }
 
   @Roles(Role.ADMIN)
@@ -250,12 +261,12 @@ export class MasterDataController {
   @Get('hr-members')
   @ApiOperation({
     operationId: 'listHrMembers',
-    summary: 'List HR members',
+    summary: 'List HR and HR Lead members (assignable owners)',
   })
-  @ApiOkResponse({ description: 'Active HR users' })
+  @ApiOkResponse({ description: 'Active HR / HR Lead users' })
   @ApiProtectedErrors()
   listHrMembers() {
-    return this.master.listMembers(Role.HR);
+    return this.master.listMembersByRoles([Role.HR, Role.HR_LEAD]);
   }
 
   @Roles(Role.ADMIN)

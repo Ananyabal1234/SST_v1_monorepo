@@ -90,6 +90,15 @@ export class CreateCandidateDto {
   @IsString()
   interviewRound?: string | null;
 
+  @ApiPropertyOptional({
+    example: 'NOT_RECEIVED',
+    description:
+      'LOI status (only when Selected): NOT_APPLICABLE | RECEIVED | NOT_RECEIVED. Offer initiates only for NOT_APPLICABLE or RECEIVED.',
+  })
+  @IsOptional()
+  @IsString()
+  loiStatus?: string;
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined)
@@ -151,6 +160,15 @@ export class UpdateCandidateDto {
   @IsOptional()
   @IsString()
   candidateStatus?: string;
+
+  @ApiPropertyOptional({
+    example: 'RECEIVED',
+    description:
+      'LOI status (only when Selected): NOT_APPLICABLE | RECEIVED | NOT_RECEIVED. Offer initiates only for NOT_APPLICABLE or RECEIVED.',
+  })
+  @IsOptional()
+  @IsString()
+  loiStatus?: string;
 
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()

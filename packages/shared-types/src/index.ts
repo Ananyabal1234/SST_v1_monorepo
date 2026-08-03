@@ -3,8 +3,11 @@ import { z } from 'zod';
 export const RoleSchema = z.enum([
   'ADMIN',
   'SALES',
+  'SALES_LEAD',
   'TA',
+  'TA_LEAD',
   'HR',
+  'HR_LEAD',
 ]);
 export type Role = z.infer<typeof RoleSchema>;
 
@@ -93,6 +96,8 @@ export const RequirementResponseSchema = z.object({
   taOwner: RequirementOwnerSchema.nullable().optional(),
   taOwnerIds: z.array(z.string().uuid()).optional(),
   taOwners: z.array(RequirementOwnerSchema).optional(),
+  taLeadIds: z.array(z.string().uuid()).optional(),
+  taLeads: z.array(RequirementOwnerSchema).optional(),
   taHandoffDate: z.string().or(z.date()).nullable().optional(),
   targetClosureDate: z.string().or(z.date()).nullable().optional(),
   remarks: z.string().nullable().optional(),
@@ -118,6 +123,7 @@ export const CreateRequirementSchema = z
     priorityCode: z.string().trim().min(1),
     taOwnerId: z.string().uuid().optional().nullable(),
     taOwnerIds: z.array(z.string().uuid()).optional(),
+    taLeadIds: z.array(z.string().uuid()).optional(),
     taHandoffDate: z.string().optional().nullable(),
     targetClosureDate: z.string().optional().nullable(),
     remarks: z.string().optional().nullable(),

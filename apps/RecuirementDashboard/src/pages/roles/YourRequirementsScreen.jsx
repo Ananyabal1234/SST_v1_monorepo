@@ -1,10 +1,23 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { get, put, post } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
-import TaOwnersMultiSelect, { formatTaOwnerNames } from '../../components/TaOwnersMultiSelect';
+import TaOwnersMultiSelect, { formatTaOwnerNames, formatTaLeadNames } from '../../components/TaOwnersMultiSelect';
+
+function normalizeMemberList(res) {
+  if (Array.isArray(res)) return res;
+  if (Array.isArray(res?.items)) return res.items;
+  if (Array.isArray(res?.data?.items)) return res.data.items;
+  if (Array.isArray(res?.data)) return res.data;
+  return [];
+}
+
+function memberLoadError(err, fallback) {
+  const raw = err?.response?.data?.message || err?.message || fallback;
+  return Array.isArray(raw) ? raw.join('; ') : String(raw);
+}
 
 // Shows the requirements from the live backend (GET /api/v1/requirements).
 // Sales users see only the requirements they own (salesOwnerId === user.id);
@@ -28,6 +41,9 @@ export default function YourRequirementsScreen() {
   const [jobFamilyOptions, setJobFamilyOptions] = useState([]);
   const [salesOwnerOptions, setSalesOwnerOptions] = useState([]);
   const [taOwnerOptions, setTaOwnerOptions] = useState([]);
+  const [taLeadOptions, setTaLeadOptions] = useState([]);
+  const [taLeadLoadError, setTaLeadLoadError] = useState(null);
+  const [assignMode, setAssignMode] = useState('none');
   const [myTaskCandidates, setMyTaskCandidates] = useState({});
   const [myTaskLoading, setMyTaskLoading] = useState({});
   const [statusBusyId, setStatusBusyId] = useState(null);
@@ -51,7 +67,7 @@ export default function YourRequirementsScreen() {
         const list = Array.isArray(res)
           ? res
           : res?.items || res?.data?.items || res?.data || [];
-        // Sales users only see their own requirements; admins see everything.
+        // Sales users only see their own requirements; sales lead / admins see everything.
         const filtered = user?.userType === 'sales'
           ? list.filter(isOwnedByCurrentSalesUser)
           : list;
@@ -69,6 +85,26 @@ export default function YourRequirementsScreen() {
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   };
+
+  const loadTaLeadOptions = useCallback(async () => {
+    const url = ENDPOINTS.TA_LEAD_MEMBERS;
+    if (!url) {
+      setTaLeadLoadError('TA Lead members endpoint is not configured.');
+      setTaLeadOptions([]);
+      return [];
+    }
+    try {
+      const res = await get(url);
+      const list = normalizeMemberList(res);
+      setTaLeadOptions(list);
+      setTaLeadLoadError(null);
+      return list;
+    } catch (err) {
+      setTaLeadOptions([]);
+      setTaLeadLoadError(memberLoadError(err, 'Failed to load TA Lead users.'));
+      return [];
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -89,20 +125,20 @@ export default function YourRequirementsScreen() {
 
     get(ENDPOINTS.SALES_MEMBERS)
       .then((res) => {
-        const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-        if (active) setSalesOwnerOptions(list);
+        if (active) setSalesOwnerOptions(normalizeMemberList(res));
       })
       .catch(() => active && setSalesOwnerOptions([]));
 
     get(ENDPOINTS.TA_MEMBERS)
       .then((res) => {
-        const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-        if (active) setTaOwnerOptions(list);
+        if (active) setTaOwnerOptions(normalizeMemberList(res));
       })
       .catch(() => active && setTaOwnerOptions([]));
 
+    void loadTaLeadOptions();
+
     return () => { active = false; };
-  }, []);
+  }, [loadTaLeadOptions]);
 
   useEffect(load, [user]);
 
@@ -122,7 +158,16 @@ export default function YourRequirementsScreen() {
   const PRIORITIES = ['HIGH', 'MEDIUM', 'LOW', 'CRITICAL'];
   const STATUSES = ['ACTIVE', 'ON_HOLD', 'CLOSED', 'CANCELLED'];
 
-  const canManageStatus = user?.userType === 'admin' || user?.userType === 'sales';
+  const canManageStatus =
+    user?.userType === 'admin' ||
+    user?.userType === 'sales' ||
+    user?.userType === 'sales_lead';
+  const canReassignSalesOwner =
+    user?.userType === 'admin' || user?.userType === 'sales_lead';
+  const canAssignTas =
+    user?.userType === 'admin' ||
+    user?.userType === 'sales' ||
+    user?.userType === 'sales_lead';
 
   const visible = useMemo(() => {
     return items.filter((r) => {
@@ -179,6 +224,20 @@ export default function YourRequirementsScreen() {
     setEditing(r);
     setEditError(null);
     setEditSuccess(null);
+    const ownerIds = Array.isArray(r.taOwnerIds) && r.taOwnerIds.length
+      ? r.taOwnerIds
+      : Array.isArray(r.taOwners) && r.taOwners.length
+        ? r.taOwners.map((t) => t.id)
+        : r.taOwner?.id || r.taOwnerId
+          ? [r.taOwner?.id || r.taOwnerId]
+          : [];
+    const leadIds = Array.isArray(r.taLeadIds) && r.taLeadIds.length
+      ? r.taLeadIds
+      : Array.isArray(r.taLeads) && r.taLeads.length
+        ? r.taLeads.map((t) => t.id)
+        : [];
+    const mode = ownerIds.length ? 'owners' : leadIds.length ? 'lead' : 'none';
+    setAssignMode(mode);
     setForm({
       requirementDate: (r.requirementDate || '').slice(0, 10),
       clientId: r.client?.id || r.clientId || '',
@@ -187,13 +246,8 @@ export default function YourRequirementsScreen() {
       numberOfPositions: r.numberOfPositions ?? '',
       salesOwnerId: r.salesOwner?.id || r.salesOwnerId || '',
       priorityCode: r.priorityCode || 'HIGH',
-      taOwnerIds: Array.isArray(r.taOwnerIds) && r.taOwnerIds.length
-        ? r.taOwnerIds
-        : Array.isArray(r.taOwners) && r.taOwners.length
-          ? r.taOwners.map((t) => t.id)
-          : r.taOwner?.id || r.taOwnerId
-            ? [r.taOwner?.id || r.taOwnerId]
-            : [],
+      taOwnerIds: ownerIds,
+      taLeadIds: leadIds,
       taHandoffDate: (r.taHandoffDate || '').slice(0, 10),
       targetClosureDate: (r.targetClosureDate || '').slice(0, 10),
       remarks: r.remarks || '',
@@ -247,7 +301,19 @@ export default function YourRequirementsScreen() {
       numberOfPositions: toInt(form.numberOfPositions),
       salesOwnerId: form.salesOwnerId,
       priorityCode: form.priorityCode,
-      taOwnerIds: Array.isArray(form.taOwnerIds) ? form.taOwnerIds : [],
+      ...(canAssignTas
+        ? assignMode === 'owners'
+          ? {
+              taOwnerIds: Array.isArray(form.taOwnerIds) ? form.taOwnerIds : [],
+              taLeadIds: [],
+            }
+          : assignMode === 'lead'
+            ? {
+                taLeadIds: Array.isArray(form.taLeadIds) ? form.taLeadIds : [],
+                taOwnerIds: [],
+              }
+            : { taOwnerIds: [], taLeadIds: [] }
+        : {}),
       taHandoffDate: form.taHandoffDate || undefined,
       targetClosureDate: form.targetClosureDate || undefined,
       remarks: form.remarks || undefined,
@@ -278,7 +344,9 @@ export default function YourRequirementsScreen() {
           <p className="yr-sub">
             {user?.userType === 'sales'
               ? 'Requirements you own, fetched live from the backend.'
-              : 'All requirements, fetched live from the backend.'}
+              : user?.userType === 'sales_lead'
+                ? 'All requirements — Sales Lead can reassign sales owners.'
+                : 'All requirements, fetched live from the backend.'}
           </p>
         </div>
         {!loading && items.length > 0 && <span className="yr-count">{visible.length} shown</span>}
@@ -356,6 +424,7 @@ export default function YourRequirementsScreen() {
                 <th>Priority</th>
                 <th>Job Location</th>
                 <th>Sales Owner</th>
+                <th>TA Lead</th>
                 <th>TA Owner</th>
                 <th>Status</th>
                 <th>Added</th>
@@ -373,6 +442,7 @@ export default function YourRequirementsScreen() {
                   <td>{r.priorityCode || '—'}</td>
                   <td>{r.jobLocation || '—'}</td>
                   <td>{r.salesOwner?.fullName || '—'}</td>
+                  <td>{formatTaLeadNames(r)}</td>
                   <td>{formatTaOwnerNames(r)}</td>
                   <td>
                     <span className={`yr-status ${(r.status || 'ACTIVE').toLowerCase()}`}>{r.status || 'ACTIVE'}</span>
@@ -522,12 +592,21 @@ export default function YourRequirementsScreen() {
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">Sales Owner</span>
-                    <select value={form.salesOwnerId} onChange={(e) => setField('salesOwnerId', e.target.value)}>
-                      <option value="">Select sales owner…</option>
-                      {salesOwners.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
+                    {canReassignSalesOwner ? (
+                      <select value={form.salesOwnerId} onChange={(e) => setField('salesOwnerId', e.target.value)}>
+                        <option value="">Select sales owner…</option>
+                        {salesOwners.map((o) => (
+                          <option key={o.id} value={o.id}>{o.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <select value={form.salesOwnerId} disabled>
+                        <option value="">Select sales owner…</option>
+                        {salesOwners.map((o) => (
+                          <option key={o.id} value={o.id}>{o.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">Priority</span>
@@ -536,12 +615,102 @@ export default function YourRequirementsScreen() {
                     </select>
                   </div>
                   <div className="detail-field full">
-                    <span className="detail-label">TA Owners</span>
-                    <TaOwnersMultiSelect
-                      options={taOwnerOptions}
-                      value={form.taOwnerIds || []}
-                      onChange={(ids) => setField('taOwnerIds', ids)}
-                    />
+                    <span className="detail-label">TA assignment</span>
+                    {canAssignTas ? (
+                      <>
+                        <div className="assign-mode-row" style={{ marginBottom: 8 }}>
+                          <label className={`assign-mode-opt${assignMode === 'none' ? ' is-active' : ''}`}>
+                            <input
+                              type="radio"
+                              name="editAssignMode"
+                              checked={assignMode === 'none'}
+                              onChange={() => {
+                                setAssignMode('none');
+                                setField('taOwnerIds', []);
+                                setField('taLeadIds', []);
+                              }}
+                            />
+                            Unassigned
+                          </label>
+                          <label className={`assign-mode-opt${assignMode === 'lead' ? ' is-active' : ''}`}>
+                            <input
+                              type="radio"
+                              name="editAssignMode"
+                              checked={assignMode === 'lead'}
+                              onChange={() => {
+                                setAssignMode('lead');
+                                setField('taOwnerIds', []);
+                                if (taLeadOptions.length === 0) {
+                                  void loadTaLeadOptions();
+                                }
+                              }}
+                            />
+                            Via TA Lead
+                          </label>
+                          <label className={`assign-mode-opt${assignMode === 'owners' ? ' is-active' : ''}`}>
+                            <input
+                              type="radio"
+                              name="editAssignMode"
+                              checked={assignMode === 'owners'}
+                              onChange={() => {
+                                setAssignMode('owners');
+                                setField('taLeadIds', []);
+                              }}
+                            />
+                            Direct TA Owner(s)
+                          </label>
+                        </div>
+                        {assignMode === 'lead' && (
+                          <>
+                            <TaOwnersMultiSelect
+                              options={taLeadOptions}
+                              value={form.taLeadIds || []}
+                              onChange={(ids) => setField('taLeadIds', ids)}
+                              idPrefix="edit-ta-lead"
+                              placeholder="Select TA Lead(s)…"
+                              emptyMessage={
+                                taLeadLoadError
+                                  ? taLeadLoadError
+                                  : 'No TA Lead users found. Create a TA Lead from Admin first.'
+                              }
+                              ariaLabel="TA Leads"
+                            />
+                            {taLeadLoadError && (
+                              <div className="add-error" style={{ marginTop: 8 }}>
+                                {taLeadLoadError}
+                                <button
+                                  type="button"
+                                  className="filter-clear"
+                                  style={{ marginLeft: 8 }}
+                                  onClick={() => void loadTaLeadOptions()}
+                                >
+                                  Retry
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        {assignMode === 'owners' && (
+                          <TaOwnersMultiSelect
+                            options={taOwnerOptions}
+                            value={form.taOwnerIds || []}
+                            onChange={(ids) => setField('taOwnerIds', ids)}
+                            idPrefix="edit-ta-owner"
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <input
+                        readOnly
+                        value={
+                          formatTaOwnerNames(editing) !== '—'
+                            ? `Owners: ${formatTaOwnerNames(editing)}`
+                            : formatTaLeadNames(editing) !== '—'
+                              ? `TA Leads: ${formatTaLeadNames(editing)}`
+                              : 'Unassigned'
+                        }
+                      />
+                    )}
                   </div>
                   <div className="detail-field">
                     <span className="detail-label">TA Handoff Date</span>

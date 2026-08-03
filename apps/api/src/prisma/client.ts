@@ -6,5 +6,6 @@ export {
   PrismaClient,
   Role,
   RequirementStatus,
+  LoiStatus,
   $Enums,
 } from '@prisma/client';

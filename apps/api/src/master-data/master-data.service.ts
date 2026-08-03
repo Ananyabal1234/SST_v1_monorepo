@@ -208,6 +208,18 @@ export class MasterDataService {
     });
   }
 
+  listMembersByRoles(roles: Role[]): Promise<any> {
+    return this.prisma.user.findMany({
+      where: {
+        deletedAt: null,
+        isActive: true,
+        role: { in: roles },
+      },
+      select: MEMBER_SELECT,
+      orderBy: { fullName: 'asc' },
+    });
+  }
+
   async createMember(role: Role, dto: CreateMemberDto, actorId: string): Promise<any> {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({ where: { email } });

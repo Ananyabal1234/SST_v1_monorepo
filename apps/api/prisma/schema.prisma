@@ -23,6 +23,7 @@ model User {
   salesRequirements Requirement[]  @relation("SalesOwner")
   taRequirements    Requirement[]  @relation("TaOwner")
   taAssignments     RequirementTaAssignment[]
+  taLeadAssignments RequirementTaLeadAssignment[]
 
   @@map("users")
 }
@@ -120,6 +121,7 @@ model Requirement {
   salesOwner        User              @relation("SalesOwner", fields: [salesOwnerId], references: [id])
   taOwner           User?             @relation("TaOwner", fields: [taOwnerId], references: [id])
   taAssignments     RequirementTaAssignment[]
+  taLeadAssignments RequirementTaLeadAssignment[]
 
   @@index([status])
   @@index([taOwnerId])
@@ -143,6 +145,19 @@ model RequirementTaAssignment {
   @@map("requirement_ta_assignments")
 }
 
+model RequirementTaLeadAssignment {
+  id            String      @id @default(uuid())
+  requirementId String      @map("requirement_id")
+  userId        String      @map("user_id")
+  assignedAt    DateTime    @default(now()) @map("assigned_at")
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([requirementId, userId])
+  @@index([userId])
+  @@map("requirement_ta_lead_assignments")
+}
+
 model Candidate {
   id          String      @id @default(uuid())
   publicId             String      @unique @map("public_id")
@@ -162,6 +177,8 @@ model Candidate {
   interviewRound       String?     @map("interview_round")
   selected             Boolean     @default(false)
   selectedAt           DateTime?   @map("selected_at")
+  /// LOI gate: offer only when NOT_APPLICABLE or RECEIVED (default NOT_RECEIVED on select).
+  loiStatus            LoiStatus   @default(NOT_RECEIVED) @map("loi_status")
   remarks              String?
   createdAt            DateTime    @default(now()) @map("created_at")
   updatedAt            DateTime    @updatedAt @map("updated_at")
@@ -257,8 +274,11 @@ model IdSequence {
 enum Role {
   ADMIN
   SALES
+  SALES_LEAD
   TA
+  TA_LEAD
   HR
+  HR_LEAD
 }
 
 enum RequirementStatus {
@@ -266,4 +286,11 @@ enum RequirementStatus {
   ON_HOLD
   CANCELLED
   CLOSED
+}
+
+/// Letter of Intent gate before offer initiation (Agyom).
+enum LoiStatus {
+  NOT_APPLICABLE
+  RECEIVED
+  NOT_RECEIVED
 }

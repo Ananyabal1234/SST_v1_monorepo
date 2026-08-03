@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, Role } from '../prisma/client';
+import { Prisma, Role, LoiStatus } from '../prisma/client';
 import { normalizeEmail, normalizeMobile } from '@sst/shared-utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
@@ -24,6 +24,31 @@ type StatusFields = {
   selectedAt?: Date | null;
   feedbackCode?: string | null;
 };
+
+const LOI_STATUSES = new Set<string>([
+  LoiStatus.NOT_APPLICABLE,
+  LoiStatus.RECEIVED,
+  LoiStatus.NOT_RECEIVED,
+]);
+
+function parseLoiStatus(raw?: string | null): LoiStatus {
+  const code = String(raw ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+  if (!LOI_STATUSES.has(code)) {
+    throw new BadRequestException(
+      'loiStatus must be NOT_APPLICABLE, RECEIVED, or NOT_RECEIVED',
+    );
+  }
+  return code as LoiStatus;
+}
+
+function isLoiEligibleForOffer(status: LoiStatus | string | null | undefined) {
+  return (
+    status === LoiStatus.NOT_APPLICABLE || status === LoiStatus.RECEIVED
+  );
+}
 
 const candidateOfferOnboardingInclude = {
   offer: { select: { id: true, publicId: true, statusCode: true } },
@@ -109,6 +134,7 @@ export class CandidatesService {
       stageCode,
       feedbackCode,
       selected,
+      loiStatus: (row.loiStatus as string | null) ?? LoiStatus.NOT_RECEIVED,
       candidateStatus: this.deriveCandidateStatus(selected, feedbackCode),
       pipelineStage: pipeline.pipelineStage,
       pipelineLabel: pipeline.pipelineLabel,
@@ -565,6 +591,7 @@ export class CandidatesService {
       ...(actor?.role === Role.SALES
         ? { requirement: { salesOwnerId: actor.id, deletedAt: null } }
         : {}),
+      // SALES_LEAD sees all candidates (no owner filter)
       ...(actor?.role === Role.TA
         ? {
             requirement: {
@@ -642,6 +669,17 @@ export class CandidatesService {
     const statusFields = this.resolveStatusFields(dto, false);
     const stageCode = await this.assertStageCode(dto.stageCode);
     const interviewRound = await this.assertInterviewRound(dto.interviewRound);
+    const becomingSelected = Boolean(statusFields.selected);
+    if (dto.loiStatus !== undefined && !becomingSelected) {
+      throw new BadRequestException(
+        'LOI status can only be set after the candidate is Selected',
+      );
+    }
+    const loiStatus = becomingSelected
+      ? dto.loiStatus !== undefined
+        ? parseLoiStatus(dto.loiStatus)
+        : LoiStatus.NOT_RECEIVED
+      : LoiStatus.NOT_RECEIVED;
 
     const row = await this.prisma.candidate.create({
       data: {
@@ -659,6 +697,7 @@ export class CandidatesService {
         feedbackCode: statusFields.feedbackCode ?? dto.feedbackCode,
         selected: statusFields.selected ?? false,
         selectedAt: statusFields.selectedAt ?? null,
+        loiStatus,
         profileSubmittedDate: dto.profileSubmittedDate
           ? new Date(dto.profileSubmittedDate)
           : undefined,
@@ -745,6 +784,25 @@ export class CandidatesService {
         ? await this.assertInterviewRound(dto.interviewRound)
         : undefined;
 
+    const nextSelected =
+      statusFields.selected !== undefined
+        ? Boolean(statusFields.selected)
+        : before.selected;
+
+    let nextLoiStatus: LoiStatus | undefined;
+    if (dto.loiStatus !== undefined) {
+      if (!nextSelected) {
+        throw new BadRequestException(
+          'LOI status can only be set after the candidate is Selected',
+        );
+      }
+      nextLoiStatus = parseLoiStatus(dto.loiStatus);
+    } else if (statusFields.selected === true && !before.selected) {
+      nextLoiStatus = LoiStatus.NOT_RECEIVED;
+    } else if (statusFields.selected === false) {
+      nextLoiStatus = LoiStatus.NOT_RECEIVED;
+    }
+
     const row = await this.prisma.candidate.update({
       where: { id: before.id },
       data: {
@@ -767,6 +825,7 @@ export class CandidatesService {
               selectedAt: statusFields.selectedAt,
             }
           : {}),
+        ...(nextLoiStatus !== undefined ? { loiStatus: nextLoiStatus } : {}),
         profileSubmittedDate:
           dto.profileSubmittedDate === undefined
             ? undefined
@@ -803,7 +862,7 @@ export class CandidatesService {
       after: row,
     });
 
-    if (row.selected && !before.offer) {
+    if (row.selected && isLoiEligibleForOffer(row.loiStatus) && !before.offer) {
       await this.offers.ensureForSelectedCandidate(row.id, actor.id);
     }
     if (row.selected && !before.selected) {
@@ -851,6 +910,10 @@ export class CandidatesService {
       data: {
         selected,
         selectedAt: selected ? new Date() : null,
+        ...(selected && !before.selected
+          ? { loiStatus: LoiStatus.NOT_RECEIVED }
+          : {}),
+        ...(!selected ? { loiStatus: LoiStatus.NOT_RECEIVED } : {}),
       },
       include: {
         requirement: {
@@ -865,7 +928,7 @@ export class CandidatesService {
       action: 'SELECT',
       actorUserId: actor.id,
       before: { selected: before.selected },
-      after: { selected: row.selected },
+      after: { selected: row.selected, loiStatus: row.loiStatus },
     });
 
     if (selected) {

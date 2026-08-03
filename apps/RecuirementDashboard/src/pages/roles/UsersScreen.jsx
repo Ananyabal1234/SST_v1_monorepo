@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { get, post, patch, del } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconUser, IconFilePlus, IconFilter, IconEdit } from '../../components/Icons';
+import { IconUser, IconFilePlus, IconFilter, IconEdit, IconEye, IconEyeOff } from '../../components/Icons';
 
 const EMPTY_FORM = {
   email: '',
@@ -15,8 +15,11 @@ const PAGE_SIZE = 20;
 
 const FALLBACK_ROLES = [
   { value: 'SALES', label: 'Sales Owner' },
+  { value: 'SALES_LEAD', label: 'Sales Lead' },
   { value: 'TA', label: 'TA Owner' },
+  { value: 'TA_LEAD', label: 'TA Lead' },
   { value: 'HR', label: 'HR Owner' },
+  { value: 'HR_LEAD', label: 'HR Lead' },
   { value: 'ADMIN', label: 'Admin' },
 ];
 
@@ -72,6 +75,8 @@ export default function UsersScreen() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [showCreatePassword, setShowCreatePassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -144,6 +149,7 @@ export default function UsersScreen() {
   const openEdit = (u) => {
     setEditError(null);
     setSuccess(null);
+    setShowResetPassword(false);
     setEditing({
       id: u.id,
       email: u.email,
@@ -158,6 +164,7 @@ export default function UsersScreen() {
     setEditing(null);
     setEditError(null);
     setEditSaving(false);
+    setShowResetPassword(false);
   };
 
   const saveEdit = async (e) => {
@@ -431,7 +438,7 @@ export default function UsersScreen() {
         <div>
           <h2 className="assign-title" style={{ fontSize: 18 }}>Create User</h2>
           <p className="assign-sub">
-            Admin only — create login credentials for Sales, TA, HR, or Admin.
+            Admin only — create login credentials for Sales, Sales Lead, TA, TA Lead, HR, HR Lead, or Admin.
           </p>
         </div>
       </div>
@@ -478,14 +485,25 @@ export default function UsersScreen() {
 
           <label className="detail-field">
             <span className="detail-label">Password *</span>
-            <input
-              type="password"
-              placeholder="Minimum 8 characters"
-              value={form.password}
-              onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-              required
-              minLength={8}
-            />
+            <div className="password-field">
+              <input
+                type={showCreatePassword ? 'text' : 'password'}
+                placeholder="Minimum 8 characters"
+                value={form.password}
+                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                required
+                minLength={8}
+              />
+              <button
+                type="button"
+                className="password-toggle"
+                onClick={() => setShowCreatePassword((v) => !v)}
+                title={showCreatePassword ? 'Hide password' : 'Show password'}
+                aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+              >
+                {showCreatePassword ? <IconEyeOff /> : <IconEye />}
+              </button>
+            </div>
           </label>
         </div>
 
@@ -563,13 +581,24 @@ export default function UsersScreen() {
 
                   <label className="detail-field">
                     <span className="detail-label">Reset password (optional)</span>
-                    <input
-                      type="password"
-                      placeholder="Leave blank to keep current password"
-                      value={editing.newPassword}
-                      onChange={(e) => setEditing((p) => ({ ...p, newPassword: e.target.value }))}
-                      minLength={8}
-                    />
+                    <div className="password-field">
+                      <input
+                        type={showResetPassword ? 'text' : 'password'}
+                        placeholder="Leave blank to keep current password"
+                        value={editing.newPassword}
+                        onChange={(e) => setEditing((p) => ({ ...p, newPassword: e.target.value }))}
+                        minLength={8}
+                      />
+                      <button
+                        type="button"
+                        className="password-toggle"
+                        onClick={() => setShowResetPassword((v) => !v)}
+                        title={showResetPassword ? 'Hide password' : 'Show password'}
+                        aria-label={showResetPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showResetPassword ? <IconEyeOff /> : <IconEye />}
+                      </button>
+                    </div>
                   </label>
                 </div>
               </div>

@@ -335,10 +335,15 @@ export class OnboardingService {
       where: { id: actorId, deletedAt: null },
     });
 
-    let hrOwnerId = actor?.role === 'HR' ? actor.id : null;
+    let hrOwnerId =
+      actor?.role === 'HR' || actor?.role === 'HR_LEAD' ? actor.id : null;
     if (!hrOwnerId) {
       const hr = await this.prisma.user.findFirst({
-        where: { role: 'HR', isActive: true, deletedAt: null },
+        where: {
+          role: { in: ['HR', 'HR_LEAD'] },
+          isActive: true,
+          deletedAt: null,
+        },
         orderBy: { createdAt: 'asc' },
       });
       if (!hr) {
