@@ -203,9 +203,34 @@ async function main() {
     update: {},
   });
 
+  let taLeadEmail: string | null = null;
+  const taLeadEmailRaw = process.env.SEED_TA_LEAD_EMAIL?.trim();
+  const taLeadPassword = process.env.SEED_TA_LEAD_PASSWORD;
+  if (taLeadEmailRaw && taLeadPassword) {
+    const email = taLeadEmailRaw.toLowerCase();
+    const taLeadHash = await bcrypt.hash(taLeadPassword, 10);
+    const taLead = await prisma.user.upsert({
+      where: { email },
+      create: {
+        email,
+        fullName: 'SST TA Lead',
+        role: Role.TA_LEAD,
+        passwordHash: taLeadHash,
+      },
+      update: {
+        passwordHash: taLeadHash,
+        role: Role.TA_LEAD,
+        isActive: true,
+        deletedAt: null,
+      },
+    });
+    taLeadEmail = taLead.email;
+  }
+
   // eslint-disable-next-line no-console
   console.log('Seeded users:', {
     admin: admin.email,
+    ...(taLeadEmail ? { taLead: taLeadEmail } : {}),
   });
 }
 

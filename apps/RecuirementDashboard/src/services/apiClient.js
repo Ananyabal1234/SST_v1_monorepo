@@ -121,6 +121,7 @@ const LIVE_ENDPOINTS = [
   '/api/v1/master-data/clients',
   '/api/v1/master-data/sales-members',
   '/api/v1/master-data/ta-members',
+  '/api/v1/master-data/ta-lead-members',
   '/api/v1/master-data/candidate-status',
   '/api/v1/master-data/lookups',
   '/api/v1/candidates',

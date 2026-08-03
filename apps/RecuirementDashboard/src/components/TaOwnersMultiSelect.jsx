@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-/** Compact multi-select dropdown for assigning TAs to a requirement (shared pool). */
+/** Compact multi-select dropdown for assigning TAs / TA Leads to a requirement. */
 export default function TaOwnersMultiSelect({
   options = [],
   value = [],
   onChange,
   disabled = false,
   idPrefix = 'ta-owner',
+  placeholder = 'Select TA owners…',
+  emptyMessage = 'No TA users found. Create a TA user from Admin first.',
+  ariaLabel = 'TA owners',
 }) {
   const selected = Array.isArray(value) ? value : [];
   const [open, setOpen] = useState(false);
@@ -39,11 +42,11 @@ export default function TaOwnersMultiSelect({
   }, [options]);
 
   const summary = useMemo(() => {
-    if (!selected.length) return 'Select TA owners…';
+    if (!selected.length) return placeholder;
     const names = selected.map((id) => labelById.get(id) || id);
     if (names.length <= 2) return names.join(', ');
     return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
-  }, [selected, labelById]);
+  }, [selected, labelById, placeholder]);
 
   const toggle = (id) => {
     if (disabled) return;
@@ -57,7 +60,7 @@ export default function TaOwnersMultiSelect({
   if (!options.length) {
     return (
       <div className="ta-multi-empty">
-        No TA users found. Create a TA user from Admin first.
+        {emptyMessage}
       </div>
     );
   }
@@ -79,7 +82,7 @@ export default function TaOwnersMultiSelect({
       </button>
 
       {open && (
-        <div className="ta-multi-panel" role="listbox" aria-multiselectable="true" aria-label="TA owners">
+        <div className="ta-multi-panel" role="listbox" aria-multiselectable="true" aria-label={ariaLabel}>
           {options.map((o) => {
             const id = o.id;
             const label = o.fullName || o.name || o.email || id;
@@ -113,4 +116,11 @@ export function formatTaOwnerNames(requirement) {
     return requirement.taOwners.map((t) => t.fullName || t.name || t.email).filter(Boolean).join(', ');
   }
   return requirement?.taOwner?.fullName || requirement?.taOwner?.name || '—';
+}
+
+export function formatTaLeadNames(requirement) {
+  if (Array.isArray(requirement?.taLeads) && requirement.taLeads.length) {
+    return requirement.taLeads.map((t) => t.fullName || t.name || t.email).filter(Boolean).join(', ');
+  }
+  return '—';
 }

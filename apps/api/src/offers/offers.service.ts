@@ -161,8 +161,9 @@ export class OffersService {
   } as const;
 
   /**
-   * Auto-create an INITIATED offer when a candidate is marked Selected
-   * (RecuirementDashboard never calls POST /offers).
+   * Auto-create an INITIATED offer when a candidate is Selected AND LOI allows
+   * (NOT_APPLICABLE or RECEIVED). Returns null when LOI is still NOT_RECEIVED.
+   * (RecuirementDashboard never calls POST /offers for the happy path.)
    */
   async ensureForSelectedCandidate(
     candidateId: string,
@@ -175,6 +176,12 @@ export class OffersService {
     if (!candidate) throw new NotFoundException('Candidate not found');
     if (!candidate.selected) {
       throw new BadRequestException('Candidate must be selected before offer');
+    }
+    if (
+      candidate.loiStatus !== 'NOT_APPLICABLE' &&
+      candidate.loiStatus !== 'RECEIVED'
+    ) {
+      return null;
     }
     if (candidate.offer) {
       return this.get(candidate.offer.id);
@@ -347,6 +354,14 @@ export class OffersService {
     if (!candidate) throw new NotFoundException('Candidate not found');
     if (!candidate.selected) {
       throw new BadRequestException('Candidate must be selected before offer');
+    }
+    if (
+      candidate.loiStatus !== 'NOT_APPLICABLE' &&
+      candidate.loiStatus !== 'RECEIVED'
+    ) {
+      throw new BadRequestException(
+        'Offer can only be initiated when LOI is Not Applicable or Received',
+      );
     }
     if (candidate.offer) {
       throw new ConflictException('Offer already exists for candidate');

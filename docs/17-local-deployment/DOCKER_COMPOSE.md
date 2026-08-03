@@ -2,109 +2,52 @@
 
 ## Purpose
 
-Document the Compose topology and example service definitions for local deployment.
+Local and v1 production Compose layouts for Postgres, API, and web.
 
 ## Audience
 
 DevOps, developers.
 
-## Scope
+## Layouts
 
-Example YAML for documentation (to be added under `docker/` when implementing).
+| File | Role |
+|------|------|
+| [`docker/docker-compose.yml`](../../docker/docker-compose.yml) | **Dev** — Postgres (+ optional observability profile). Run API/web with `pnpm dev`. |
+| [`docker/docker-compose.prod.yml`](../../docker/docker-compose.prod.yml) | **v1 delivery** — Postgres + `sst-api` + `sst-web` (nginx). See [DEPLOY_V1.md](./DEPLOY_V1.md). |
 
-## Definitions
+## Dev (Postgres only)
 
-| Service | Image role |
-|---------|------------|
-| postgres | DB |
-| api | Nest build |
-| web | Nginx static or Vite |
-| redis | Future stub optional profile |
-| prometheus, grafana, loki, promtail, node-exporter | Observability |
-
----
-
-## Example compose (illustrative)
-
-```yaml
-name: sst
-services:
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: sst
-      POSTGRES_PASSWORD: sst
-      POSTGRES_DB: sst
-    ports: ["5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sst"]
-      interval: 5s
-      retries: 10
-
-  api:
-    build:
-      context: ..
-      dockerfile: docker/api.Dockerfile
-    env_file: ../.env
-    ports: ["3000:3000"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  web:
-    build:
-      context: ..
-      dockerfile: docker/web.Dockerfile
-    ports: ["5173:80"]
-    depends_on: [api]
-
-  prometheus:
-    image: prom/prometheus:v2.54.0
-    volumes: [./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml]
-    ports: ["9090:9090"]
-
-  grafana:
-    image: grafana/grafana:11.1.0
-    ports: ["3001:3000"]
-    volumes: [grafana_data:/var/lib/grafana]
-
-  loki:
-    image: grafana/loki:3.0.0
-    ports: ["3100:3100"]
-
-  promtail:
-    image: grafana/promtail:3.0.0
-    volumes: [./promtail/config.yml:/etc/promtail/config.yml, /var/run/docker.sock:/var/run/docker.sock]
-
-  node-exporter:
-    image: prom/node-exporter:v1.8.1
-    pid: host
-
-  redis:
-    image: redis:7-alpine
-    profiles: ["redis"]
-    ports: ["6379:6379"]
-
-volumes:
-  pgdata:
-  grafana_data:
+```bash
+docker compose -f docker/docker-compose.yml up -d postgres
 ```
+
+Host port **5433** → container `5432`. Optional: `--profile observability` for Prometheus/Grafana.
+
+## Production Compose (v1)
+
+Images: `sst-api:1.0.0`, `sst-web:1.0.0`  
+Dockerfiles: `docker/api.Dockerfile`, `docker/web.Dockerfile`  
+Env template: `docker/.env.prod.example`
+
+```bash
+cp docker/.env.prod.example docker/.env.prod
+docker compose -f docker/docker-compose.prod.yml up -d --build
+```
+
+Full build, smoke, `docker save`/`load`, and rollback: **[DEPLOY_V1.md](./DEPLOY_V1.md)**.
 
 ## Networks
 
-Default Compose network; services resolve by service name (`postgres`, `api`).
+Prod services resolve by name (`postgres`, `api`, `web`). SPA uses relative `/api/v1`; nginx proxies `/api/` → `http://api:3000/api/`.
 
 ## Health checks
 
-Wire API `HEALTHCHECK curl -f http://localhost:3000/health`.
-
-## Recommendations
-
-Use Compose `profiles` for monitoring vs core, so lite `postgres+api+web` is fast.
+- API: `GET http://localhost:3000/health`
+- Web: `GET http://localhost/`
 
 ## References
 
-- [LOCAL_SETUP.md](./LOCAL_SETUP.md)  
-- [../06-system-design/DEPLOYMENT.md](../06-system-design/DEPLOYMENT.md)  
-- [../18-monitoring/OBSERVABILITY.md](../18-monitoring/OBSERVABILITY.md)  
+- [DEPLOY_V1.md](./DEPLOY_V1.md)
+- [LOCAL_SETUP.md](./LOCAL_SETUP.md)
+- [../06-system-design/DEPLOYMENT.md](../06-system-design/DEPLOYMENT.md)
+- [../18-monitoring/OBSERVABILITY.md](../18-monitoring/OBSERVABILITY.md)

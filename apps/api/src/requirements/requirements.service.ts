@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { IdSequenceService } from '../id-sequence/id-sequence.service';
 import {
   CreateRequirementDto,
+  TA_LEAD_UPDATE_FIELDS,
   TA_UPDATE_FIELDS,
   UpdateRequirementDto,
 } from './dto/requirements.dto';
@@ -21,26 +22,31 @@ import {
 } from '../common/pipeline-stage';
 import { MailService } from '../mail/mail.service';
 import {
+  requirementCreatedEmail,
   salesRequirementClosedEmail,
   taAssignmentEmail,
+  taLeadAssignmentEmail,
 } from '../mail/templates';
+
+const userSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  role: true,
+} as const;
 
 const requirementInclude = {
   client: true,
   jobFamily: true,
-  salesOwner: {
-    select: { id: true, fullName: true, email: true, role: true },
-  },
-  taOwner: {
-    select: { id: true, fullName: true, email: true, role: true },
-  },
+  salesOwner: { select: userSelect },
+  taOwner: { select: userSelect },
   taAssignments: {
-    include: {
-      user: {
-        select: { id: true, fullName: true, email: true, role: true },
-      },
-    },
+    include: { user: { select: userSelect } },
     orderBy: [{ isPrimary: 'desc' as const }, { assignedAt: 'asc' as const }],
+  },
+  taLeadAssignments: {
+    include: { user: { select: userSelect } },
+    orderBy: [{ assignedAt: 'asc' as const }],
   },
 } satisfies Prisma.RequirementInclude;
 
@@ -104,16 +110,25 @@ export class RequirementsService {
     });
     const taOwners = this.mapTaOwners(req);
     const taOwnerIds = taOwners.map((t) => t.id);
+    const taLeads = this.mapTaLeads(req);
+    const taLeadIds = taLeads.map((t) => t.id);
     const primary =
       taOwners.find((t) => t.id === req.taOwnerId) ?? taOwners[0] ?? null;
-    const { taAssignments: _assignments, ...rest } = req as RequirementRow & {
+    const {
+      taAssignments: _assignments,
+      taLeadAssignments: _leadAssignments,
+      ...rest
+    } = req as RequirementRow & {
       taAssignments?: unknown;
+      taLeadAssignments?: unknown;
     };
     return {
       ...rest,
       ...metrics,
       taOwners,
       taOwnerIds,
+      taLeads,
+      taLeadIds,
       taOwner: primary
         ? {
             id: primary.id,
@@ -158,6 +173,19 @@ export class RequirementsService {
     return [];
   }
 
+  private mapTaLeads(req: {
+    taLeadAssignments?: Array<{
+      user: { id: string; fullName: string; email: string; role?: string };
+    }>;
+  }) {
+    return (req.taLeadAssignments ?? []).map((a) => ({
+      id: a.user.id,
+      fullName: a.user.fullName,
+      email: a.user.email,
+      role: a.user.role,
+    }));
+  }
+
   /** Normalize create/update TA fields into a deduped id list (primary first). */
   private normalizeTaOwnerIds(input: {
     taOwnerIds?: string[] | null;
@@ -179,13 +207,38 @@ export class RequirementsService {
     return undefined;
   }
 
+  private normalizeTaLeadIds(input: {
+    taLeadIds?: string[] | null;
+  }): string[] | undefined {
+    if (input.taLeadIds === undefined) return undefined;
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const id of input.taLeadIds ?? []) {
+      if (!id || seen.has(id)) continue;
+      seen.add(id);
+      ids.push(id);
+    }
+    return ids;
+  }
+
+  private assertExclusiveAssignmentMode(
+    taOwnerIds: string[],
+    taLeadIds: string[],
+  ) {
+    if (taOwnerIds.length && taLeadIds.length) {
+      throw new BadRequestException(
+        'Choose either TA Lead(s) or TA Owner(s), not both',
+      );
+    }
+  }
+
   private async syncTaAssignments(
     requirementId: string,
     taOwnerIds: string[],
     tx: TxClient,
   ): Promise<string | null> {
     for (const id of taOwnerIds) {
-      await this.assertOwner(id, Role.TA, 'taOwnerIds');
+      await this.assertTaAssignee(id);
     }
     await tx.requirementTaAssignment.deleteMany({ where: { requirementId } });
     if (taOwnerIds.length) {
@@ -203,6 +256,25 @@ export class RequirementsService {
       data: { taOwnerId: primaryId },
     });
     return primaryId;
+  }
+
+  private async syncTaLeadAssignments(
+    requirementId: string,
+    taLeadIds: string[],
+    tx: TxClient,
+  ): Promise<void> {
+    for (const id of taLeadIds) {
+      await this.assertTaLeadAssignee(id);
+    }
+    await tx.requirementTaLeadAssignment.deleteMany({ where: { requirementId } });
+    if (taLeadIds.length) {
+      await tx.requirementTaLeadAssignment.createMany({
+        data: taLeadIds.map((userId) => ({
+          requirementId,
+          userId,
+        })),
+      });
+    }
   }
 
   private async notifyAssignedTas(
@@ -234,6 +306,90 @@ export class RequirementsService {
         html: msg.html,
         scenario: 'ta-assignment',
       });
+    }
+  }
+
+  private async notifyAssignedTaLeads(
+    row: RequirementRow,
+    leadUserIds: string[],
+  ): Promise<void> {
+    if (!leadUserIds.length) return;
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: leadUserIds }, deletedAt: null },
+      select: { id: true, email: true, fullName: true },
+    });
+    const byId = new Map(users.map((u) => [u.id, u]));
+    for (const id of leadUserIds) {
+      const lead = byId.get(id);
+      if (!lead?.email) continue;
+      const msg = taLeadAssignmentEmail({
+        leadName: lead.fullName || lead.email,
+        publicId: row.publicId,
+        clientName: row.client?.name || '—',
+        roleSkill: row.roleSkill,
+        numberOfPositions: row.numberOfPositions,
+        priorityCode: row.priorityCode,
+        salesOwnerName: row.salesOwner?.fullName || row.salesOwner?.email || '—',
+      });
+      void this.mail.send({
+        to: lead.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'ta-lead-assignment',
+      });
+    }
+  }
+
+  private async notifyRequirementCreated(
+    row: RequirementRow,
+    taOwnerIds: string[],
+    taLeadIds: string[],
+  ): Promise<void> {
+    const salesOwnerName =
+      row.salesOwner?.fullName || row.salesOwner?.email || '—';
+    const base = {
+      publicId: row.publicId,
+      clientName: row.client?.name || '—',
+      roleSkill: row.roleSkill,
+      numberOfPositions: row.numberOfPositions,
+      priorityCode: row.priorityCode,
+      salesOwnerName,
+    };
+
+    if (row.salesOwner?.email) {
+      const msg = requirementCreatedEmail({
+        recipientName: row.salesOwner.fullName || row.salesOwner.email,
+        roleLabel: 'Sales owner',
+        ...base,
+      });
+      void this.mail.send({
+        to: row.salesOwner.email,
+        subject: msg.subject,
+        text: msg.text,
+        html: msg.html,
+        scenario: 'requirement-created-sales',
+      });
+    }
+
+    if (taOwnerIds.length) {
+      void this.notifyAssignedTas(row, taOwnerIds);
+    }
+
+    let leadIds = taLeadIds;
+    if (!taOwnerIds.length && !taLeadIds.length) {
+      const allLeads = await this.prisma.user.findMany({
+        where: {
+          role: Role.TA_LEAD,
+          isActive: true,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      leadIds = allLeads.map((u) => u.id);
+    }
+    if (leadIds.length) {
+      void this.notifyAssignedTaLeads(row, leadIds);
     }
   }
 
@@ -310,6 +466,7 @@ export class RequirementsService {
     requirementId: string,
     actor: AuthUser,
   ) {
+    // TA Lead may view all requirements; assignment check applies only to TA.
     if (actor.role !== Role.TA) return;
     const ok = await this.isAssignedTa(requirementId, actor.id);
     if (!ok) {
@@ -317,6 +474,52 @@ export class RequirementsService {
         'TA may only access requirements assigned to them',
       );
     }
+  }
+
+  /** Assignees may be TA Owner or TA Lead (Lead can self-assign and work). */
+  private async assertTaAssignee(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null, isActive: true },
+    });
+    if (!user) throw new BadRequestException('Invalid taOwnerIds');
+    if (
+      user.role !== Role.TA &&
+      user.role !== Role.TA_LEAD &&
+      user.role !== Role.ADMIN
+    ) {
+      throw new BadRequestException(
+        'taOwnerIds must reference an active TA or TA Lead user',
+      );
+    }
+  }
+
+  private async assertTaLeadAssignee(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null, isActive: true },
+    });
+    if (!user) throw new BadRequestException('Invalid taLeadIds');
+    if (user.role !== Role.TA_LEAD && user.role !== Role.ADMIN) {
+      throw new BadRequestException(
+        'taLeadIds must reference an active TA Lead user',
+      );
+    }
+  }
+
+  private canAssignTaOwners(role: string): boolean {
+    return (
+      role === Role.ADMIN ||
+      role === Role.TA_LEAD ||
+      role === Role.SALES ||
+      role === Role.SALES_LEAD
+    );
+  }
+
+  private canAssignTaLeads(role: string): boolean {
+    return (
+      role === Role.ADMIN ||
+      role === Role.SALES ||
+      role === Role.SALES_LEAD
+    );
   }
 
   private async assertActiveClient(clientId: string) {
@@ -347,6 +550,23 @@ export class RequirementsService {
     });
     if (!value) {
       throw new BadRequestException(`Invalid priorityCode: ${priorityCode}`);
+    }
+  }
+
+  /** Sales owners may be Sales Owner or Sales Lead. */
+  private async assertSalesOwner(userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, deletedAt: null, isActive: true },
+    });
+    if (!user) throw new BadRequestException('Invalid salesOwnerId');
+    if (
+      user.role !== Role.SALES &&
+      user.role !== Role.SALES_LEAD &&
+      user.role !== Role.ADMIN
+    ) {
+      throw new BadRequestException(
+        'salesOwnerId must reference an active Sales or Sales Lead user',
+      );
     }
   }
 
@@ -424,6 +644,26 @@ export class RequirementsService {
     return filtered;
   }
 
+  private pickTaLeadUpdate(dto: UpdateRequirementDto): UpdateRequirementDto {
+    const allowed = new Set<string>(TA_LEAD_UPDATE_FIELDS);
+    const filtered: UpdateRequirementDto = {};
+    for (const key of Object.keys(dto) as (keyof UpdateRequirementDto)[]) {
+      if (allowed.has(key) && dto[key] !== undefined) {
+        (filtered as Record<string, unknown>)[key] = dto[key];
+      }
+    }
+    const forbidden = Object.keys(dto).filter(
+      (k) =>
+        (dto as Record<string, unknown>)[k] !== undefined && !allowed.has(k),
+    );
+    if (forbidden.length) {
+      throw new ForbiddenException(
+        `TA Lead may only update: ${TA_LEAD_UPDATE_FIELDS.join(', ')}`,
+      );
+    }
+    return filtered;
+  }
+
   private assertStatusTransition(
     from: RequirementStatus,
     to: RequirementStatus,
@@ -466,6 +706,7 @@ export class RequirementsService {
       ...(actor?.role === Role.SALES
         ? { salesOwnerId: actor.id }
         : {}),
+      // SALES_LEAD / TA_LEAD / ADMIN / HR / HR_LEAD: no owner filter (see all)
       ...(query.q
         ? {
             OR: [
@@ -556,7 +797,7 @@ export class RequirementsService {
         'You can only view the pipeline for your own requirements',
       );
     }
-    if (actor.role === Role.HR) {
+    if (actor.role === Role.HR || actor.role === Role.HR_LEAD) {
       throw new ForbiddenException(
         'HR does not have access to the recruiting pipeline',
       );
@@ -629,10 +870,21 @@ export class RequirementsService {
     await this.assertActiveClient(dto.clientId);
     await this.assertActiveJobFamily(dto.jobFamilyId);
     await this.assertPriorityCode(dto.priorityCode);
-    await this.assertOwner(dto.salesOwnerId, Role.SALES, 'salesOwnerId');
-    const taOwnerIds = this.normalizeTaOwnerIds(dto) ?? [];
+    await this.assertSalesOwner(dto.salesOwnerId);
+
+    const canAssign =
+      actor.role === Role.ADMIN ||
+      actor.role === Role.SALES ||
+      actor.role === Role.SALES_LEAD;
+    const taOwnerIds = canAssign ? this.normalizeTaOwnerIds(dto) ?? [] : [];
+    const taLeadIds = canAssign ? this.normalizeTaLeadIds(dto) ?? [] : [];
+    this.assertExclusiveAssignmentMode(taOwnerIds, taLeadIds);
+
     for (const id of taOwnerIds) {
-      await this.assertOwner(id, Role.TA, 'taOwnerIds');
+      await this.assertTaAssignee(id);
+    }
+    for (const id of taLeadIds) {
+      await this.assertTaLeadAssignee(id);
     }
     this.validateBudgets(dto.minBudget, dto.maxBudget);
     this.validateDates({
@@ -673,6 +925,9 @@ export class RequirementsService {
       if (taOwnerIds.length) {
         await this.syncTaAssignments(created.id, taOwnerIds, tx);
       }
+      if (taLeadIds.length) {
+        await this.syncTaLeadAssignments(created.id, taLeadIds, tx);
+      }
       const refreshed = await tx.requirement.findFirst({
         where: { id: created.id },
         include: requirementInclude,
@@ -690,9 +945,7 @@ export class RequirementsService {
       return refreshed ?? created;
     });
 
-    if (taOwnerIds.length) {
-      void this.notifyAssignedTas(row, taOwnerIds);
-    }
+    void this.notifyRequirementCreated(row, taOwnerIds, taLeadIds);
 
     return this.withDerived(row, 0);
   }
@@ -702,7 +955,7 @@ export class RequirementsService {
     return rest;
   }
 
-  /** Full-body edit after creation (Sales/Admin). Sales cannot reassign owner. */
+  /** Full-body edit after creation (Sales/Sales Lead/Admin). Sales cannot reassign owner. */
   async replace(id: string, dto: CreateRequirementDto, actor: AuthUser): Promise<any> {
     const before = await this.findRequirementOrThrow(id);
     if (actor.role === Role.SALES && before.salesOwnerId !== actor.id) {
@@ -711,6 +964,13 @@ export class RequirementsService {
       );
     }
 
+    const canReassignSales =
+      actor.role === Role.ADMIN || actor.role === Role.SALES_LEAD;
+    const canAssign =
+      actor.role === Role.ADMIN ||
+      actor.role === Role.SALES ||
+      actor.role === Role.SALES_LEAD;
+
     const payload: UpdateRequirementDto = {
       requirementDate: dto.requirementDate,
       clientId: dto.clientId,
@@ -718,7 +978,12 @@ export class RequirementsService {
       jobFamilyId: dto.jobFamilyId,
       numberOfPositions: dto.numberOfPositions,
       priorityCode: dto.priorityCode,
-      taOwnerIds: this.normalizeTaOwnerIds(dto) ?? [],
+      ...(canAssign
+        ? {
+            taOwnerIds: this.normalizeTaOwnerIds(dto) ?? [],
+            taLeadIds: this.normalizeTaLeadIds(dto) ?? [],
+          }
+        : {}),
       taHandoffDate: dto.taHandoffDate ?? null,
       targetClosureDate: dto.targetClosureDate ?? null,
       remarks: dto.remarks ?? null,
@@ -727,8 +992,7 @@ export class RequirementsService {
       minBudget: dto.minBudget ?? null,
       maxBudget: dto.maxBudget ?? null,
       durationMonths: dto.durationMonths ?? null,
-      salesOwnerId:
-        actor.role === Role.ADMIN ? dto.salesOwnerId : before.salesOwnerId,
+      salesOwnerId: canReassignSales ? dto.salesOwnerId : before.salesOwnerId,
     };
 
     return this.update(id, payload, actor);
@@ -745,6 +1009,11 @@ export class RequirementsService {
         );
       }
       payload = this.pickSalesUpdate(dto);
+    } else if (actor.role === Role.SALES_LEAD) {
+      // Sales Lead may edit any requirement and reassign sales owner + assignees.
+      payload = dto;
+    } else if (actor.role === Role.TA_LEAD) {
+      payload = this.pickTaLeadUpdate(dto);
     } else if (actor.role === Role.TA) {
       await this.assertTaCanAccessRequirement(before.id, actor);
       payload = this.pickTaUpdate(dto);
@@ -755,15 +1024,48 @@ export class RequirementsService {
       await this.assertActiveJobFamily(payload.jobFamilyId);
     if (payload.priorityCode)
       await this.assertPriorityCode(payload.priorityCode);
-    if (payload.salesOwnerId)
-      await this.assertOwner(payload.salesOwnerId, Role.SALES, 'salesOwnerId');
+    if (payload.salesOwnerId) await this.assertSalesOwner(payload.salesOwnerId);
 
     const nextTaOwnerIds = this.normalizeTaOwnerIds(payload);
+    const nextTaLeadIds = this.normalizeTaLeadIds(payload);
+
     if (nextTaOwnerIds) {
+      if (!this.canAssignTaOwners(actor.role)) {
+        throw new ForbiddenException(
+          'Only Admin, Sales, Sales Lead, or TA Lead may assign TA owners',
+        );
+      }
       for (const taId of nextTaOwnerIds) {
-        await this.assertOwner(taId, Role.TA, 'taOwnerIds');
+        await this.assertTaAssignee(taId);
       }
     }
+    if (nextTaLeadIds) {
+      if (!this.canAssignTaLeads(actor.role)) {
+        throw new ForbiddenException(
+          'Only Admin, Sales, or Sales Lead may assign TA Leads',
+        );
+      }
+      for (const leadId of nextTaLeadIds) {
+        await this.assertTaLeadAssignee(leadId);
+      }
+    }
+
+    if (nextTaOwnerIds !== undefined && nextTaLeadIds !== undefined) {
+      this.assertExclusiveAssignmentMode(nextTaOwnerIds, nextTaLeadIds);
+    }
+
+    // Sales/Admin mode switch: assigning owners clears leads (and vice versa).
+    // TA Lead assigning owners must keep existing taLeadIds.
+    const clearLeadsOnOwnerAssign =
+      this.canAssignTaLeads(actor.role) &&
+      nextTaOwnerIds !== undefined &&
+      nextTaOwnerIds.length > 0 &&
+      nextTaLeadIds === undefined;
+    const clearOwnersOnLeadAssign =
+      this.canAssignTaLeads(actor.role) &&
+      nextTaLeadIds !== undefined &&
+      nextTaLeadIds.length > 0 &&
+      nextTaOwnerIds === undefined;
 
     const minBudget =
       payload.minBudget !== undefined
@@ -837,14 +1139,33 @@ export class RequirementsService {
     const previousTaIds = new Set(
       (before.taAssignments || []).map((a) => a.userId),
     );
+    const previousLeadIds = new Set(
+      (before.taLeadAssignments || []).map((a) => a.userId),
+    );
+
+    const effectiveOwnerIds =
+      nextTaOwnerIds !== undefined
+        ? nextTaOwnerIds
+        : clearOwnersOnLeadAssign
+          ? []
+          : undefined;
+    const effectiveLeadIds =
+      nextTaLeadIds !== undefined
+        ? nextTaLeadIds
+        : clearLeadsOnOwnerAssign
+          ? []
+          : undefined;
 
     const row = await this.prisma.$transaction(async (tx) => {
       await tx.requirement.update({
         where: { id: before.id },
         data,
       });
-      if (nextTaOwnerIds) {
-        await this.syncTaAssignments(before.id, nextTaOwnerIds, tx);
+      if (effectiveOwnerIds !== undefined) {
+        await this.syncTaAssignments(before.id, effectiveOwnerIds, tx);
+      }
+      if (effectiveLeadIds !== undefined) {
+        await this.syncTaLeadAssignments(before.id, effectiveLeadIds, tx);
       }
       const updated = await tx.requirement.findFirstOrThrow({
         where: { id: before.id },
@@ -864,10 +1185,18 @@ export class RequirementsService {
       return updated;
     });
 
-    if (nextTaOwnerIds) {
-      const newlyAdded = nextTaOwnerIds.filter((id) => !previousTaIds.has(id));
+    if (effectiveOwnerIds !== undefined) {
+      const newlyAdded = effectiveOwnerIds.filter((id) => !previousTaIds.has(id));
       if (newlyAdded.length) {
         void this.notifyAssignedTas(row, newlyAdded);
+      }
+    }
+    if (effectiveLeadIds !== undefined) {
+      const newlyAddedLeads = effectiveLeadIds.filter(
+        (id) => !previousLeadIds.has(id),
+      );
+      if (newlyAddedLeads.length) {
+        void this.notifyAssignedTaLeads(row, newlyAddedLeads);
       }
     }
 
@@ -880,8 +1209,13 @@ export class RequirementsService {
     actor: AuthUser,
   ): Promise<void> {
     if (actor.role === Role.ADMIN) return;
-    if (actor.role === Role.TA) {
-      await this.assertTaCanAccessRequirement(requirementId, actor);
+    if (actor.role === Role.TA || actor.role === Role.TA_LEAD) {
+      const ok = await this.isAssignedTa(requirementId, actor.id);
+      if (!ok) {
+        throw new ForbiddenException(
+          'Only Admin or assigned TA may mutate candidates on a requirement',
+        );
+      }
       return;
     }
     throw new ForbiddenException(

@@ -6,16 +6,22 @@ const AuthContext = createContext(null);
 
 export const USER_TYPES = {
   SALES: 'sales',
+  SALES_LEAD: 'sales_lead',
   TA_OWNER: 'ta_owner',
+  TA_LEAD: 'ta_lead',
   HR: 'hr',
+  HR_LEAD: 'hr_lead',
   ONBOARDING: 'onboarding',
   ADMIN: 'admin',
 };
 
 export const USER_TYPE_LABELS = {
   sales: 'Sales',
+  sales_lead: 'Sales Lead',
   ta_owner: 'TA Owner',
+  ta_lead: 'TA Lead',
   hr: 'HR',
+  hr_lead: 'HR Lead',
   onboarding: 'Onboarding',
   admin: 'Admin',
 };
@@ -25,9 +31,12 @@ export const USER_TYPE_LABELS = {
 const ROLE_TO_USER_TYPE = {
   ADMIN: 'admin',
   SALES: 'sales',
+  SALES_LEAD: 'sales_lead',
   TA: 'ta_owner',
   TA_OWNER: 'ta_owner',
+  TA_LEAD: 'ta_lead',
   HR: 'hr',
+  HR_LEAD: 'hr_lead',
   ONBOARDING: 'onboarding',
 };
 

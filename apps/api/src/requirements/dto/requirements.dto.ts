@@ -59,6 +59,17 @@ export class CreateRequirementDto {
   taOwnerIds?: string[];
 
   @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description: 'One or more TA Lead user IDs responsible for assigning TAs',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  taLeadIds?: string[];
+
+  @ApiPropertyOptional({
     format: 'uuid',
     nullable: true,
     description: 'Legacy single TA; normalized into taOwnerIds when taOwnerIds omitted',
@@ -158,6 +169,17 @@ export class UpdateRequirementDto {
   @IsUUID('4', { each: true })
   taOwnerIds?: string[];
 
+  @ApiPropertyOptional({
+    type: [String],
+    format: 'uuid',
+    description: 'Replace full TA Lead assignment set',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @IsUUID('4', { each: true })
+  taLeadIds?: string[];
+
   @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @ValidateIf((_, v) => v !== null && v !== undefined && v !== '')
@@ -225,6 +247,12 @@ export class RequirementStatusDto {
 
 /** Fields a TA user may update on an assigned requirement. */
 export const TA_UPDATE_FIELDS = [
+  'taHandoffDate',
+  'remarks',
+] as const;
+
+/** Fields a TA Lead may update when assigning TAs to a requirement. */
+export const TA_LEAD_UPDATE_FIELDS = [
   'taOwnerId',
   'taOwnerIds',
   'taHandoffDate',

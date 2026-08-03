@@ -95,14 +95,32 @@ export class UsersService {
             'Creates credentials used as salesOwnerId on requirements',
         },
         {
+          value: Role.SALES_LEAD,
+          label: 'Sales Lead',
+          description:
+            'Oversees all sales requirements; may assign sales owners and work as Sales',
+        },
+        {
           value: Role.TA,
           label: 'TA Owner',
           description: 'Creates credentials used as taOwnerId on requirements',
         },
         {
+          value: Role.TA_LEAD,
+          label: 'TA Lead',
+          description:
+            'Assigns requirements to TA owners; may also work as an assigned TA',
+        },
+        {
           value: Role.HR,
           label: 'HR Owner',
           description: 'Creates credentials used as hrOwnerId on onboarding',
+        },
+        {
+          value: Role.HR_LEAD,
+          label: 'HR Lead',
+          description:
+            'Oversees offers and onboarding; may also work as HR Owner',
         },
         {
           value: Role.ADMIN,
