@@ -24,15 +24,15 @@ RUN pnpm --filter @sst/shared-types build \
   && pnpm --filter @sst/api build
 
 FROM base AS production
-ENV NODE_ENV=production
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/api/prisma ./apps/api/prisma
 COPY packages/shared-types/package.json ./packages/shared-types/
 COPY packages/shared-utils/package.json ./packages/shared-utils/
 COPY packages/typescript-config ./packages/typescript-config/
-# Include prisma CLI (devDependency) for migrate deploy at startup
+# Install all deps (prisma + tsx) for migrate deploy + optional first-boot seed
 RUN pnpm install --frozen-lockfile --filter @sst/api...
+ENV NODE_ENV=production
 COPY --from=build /app/packages/shared-types/dist ./packages/shared-types/dist
 COPY --from=build /app/packages/shared-utils/dist ./packages/shared-utils/dist
 COPY --from=build /app/apps/api/dist ./apps/api/dist

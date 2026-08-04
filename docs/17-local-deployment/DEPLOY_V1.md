@@ -54,17 +54,34 @@ Open http://localhost and confirm the login page. Full Product journey: [12-ui-u
 
 ## 5. First admin (greenfield)
 
-Prod entrypoint does **not** seed. Options:
+### A. Docker first-boot (recommended for Hub / offline images)
 
-1. **One-off seed (demo only)** — after stack is healthy, from monorepo with `DATABASE_URL` pointing at `localhost:5433` and `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` set:
+Set both vars in `docker/.env.prod` (or `-e` on `docker run`) before starting the API:
 
-   ```bash
-   pnpm --filter @sst/api prisma:seed
-   ```
+```env
+SEED_ADMIN_EMAIL=admin@yourorg.com
+SEED_ADMIN_PASSWORD=YourStrongPassword123!
+```
 
-2. Or create the first user via a controlled ops process once an admin bootstrap path exists.
+On **first** start only (no `ADMIN` row yet), the API entrypoint runs seed with `SEED_FIRST_BOOT_ONLY=1` and creates:
 
-Do not bake demo passwords into images.
+- that admin user  
+- lookup tables (priority, stages, offer status, etc.)
+
+Later restarts **do not** reset the password or re-seed if an admin already exists.  
+Unsetting `SEED_ADMIN_*` → no auto user (empty logins).
+
+### B. Manual monorepo seed
+
+After stack is healthy, from monorepo with `DATABASE_URL` → `localhost:5433`:
+
+```bash
+pnpm --filter @sst/api prisma:seed
+```
+
+(Manual seed **upserts** admin password every run; does not use first-boot skip.)
+
+Do not bake demo passwords into the image layers.
 
 ## 6. Offline handoff (`docker save` / `load`)
 
@@ -92,7 +109,48 @@ docker compose -f docker/docker-compose.prod.yml up -d
 # Postgres still pulls `postgres:16-alpine` from Docker Hub unless cached.
 ```
 
-Optional next step (out of v1 scope): push `sst-api` / `sst-web` to GHCR/ECR.
+Optional next step (out of v1 scope): push to GHCR/ECR as well.
+
+## 6b. Docker Hub (online pull)
+
+Published under Hub user **harshhhh261**:
+
+| Image | Tags |
+|-------|------|
+| [harshhhh261/sst-api](https://hub.docker.com/r/harshhhh261/sst-api) | `1.0.0`, `latest` |
+| [harshhhh261/sst-web](https://hub.docker.com/r/harshhhh261/sst-web) | `1.0.0`, `latest` |
+
+On a machine with Docker and internet:
+
+```bash
+cp docker/.env.prod.example docker/.env.prod
+# edit JWT secrets + optional SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD for first login
+docker compose -f docker/docker-compose.prod.yml pull
+docker compose -f docker/docker-compose.prod.yml up -d
+```
+
+Compose defaults:
+
+- `SST_API_IMAGE=harshhhh261/sst-api:1.0.0`
+- `SST_WEB_IMAGE=harshhhh261/sst-web:1.0.0`
+
+Override if needed:
+
+```bash
+# PowerShell
+$env:SST_API_IMAGE="harshhhh261/sst-api:latest"
+$env:SST_WEB_IMAGE="harshhhh261/sst-web:latest"
+docker compose -f docker/docker-compose.prod.yml up -d
+```
+
+Re-push after a local rebuild:
+
+```bash
+docker tag sst-api:1.0.0 harshhhh261/sst-api:1.0.0
+docker tag sst-web:1.0.0 harshhhh261/sst-web:1.0.0
+docker push harshhhh261/sst-api:1.0.0
+docker push harshhhh261/sst-web:1.0.0
+```
 
 ## 7. Logs & stop
 
