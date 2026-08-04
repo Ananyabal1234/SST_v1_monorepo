@@ -72,6 +72,26 @@ async function main() {
       'SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD must be set in the environment before seeding',
     );
   }
+
+  // Docker first-boot: only create admin + lookups when no admin exists yet
+  const firstBootOnly =
+    process.env.SEED_FIRST_BOOT_ONLY === '1' ||
+    process.env.SEED_FIRST_BOOT_ONLY === 'true';
+  if (firstBootOnly) {
+    const adminCount = await prisma.user.count({
+      where: { role: Role.ADMIN, deletedAt: null },
+    });
+    if (adminCount > 0) {
+      // eslint-disable-next-line no-console
+      console.log(
+        '[seed] Admin already exists; skipping first-boot seed (lookups/admin password unchanged).',
+      );
+      return;
+    }
+    // eslint-disable-next-line no-console
+    console.log('[seed] First-boot: creating admin and reference lookups...');
+  }
+
   const adminEmail = adminEmailRaw.toLowerCase();
 
   const passwordHash = await bcrypt.hash(adminPassword, 10);

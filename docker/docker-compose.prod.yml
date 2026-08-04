@@ -22,7 +22,7 @@ services:
       - sst_v1_net
 
   api:
-    image: sst-api:1.0.0
+    image: ${SST_API_IMAGE:-harshhhh261/sst-api:1.0.0}
     build:
       context: ..
       dockerfile: docker/api.Dockerfile
@@ -42,7 +42,7 @@ services:
       - sst_v1_net
 
   web:
-    image: sst-web:1.0.0
+    image: ${SST_WEB_IMAGE:-harshhhh261/sst-web:1.0.0}
     build:
       context: ..
       dockerfile: docker/web.Dockerfile
