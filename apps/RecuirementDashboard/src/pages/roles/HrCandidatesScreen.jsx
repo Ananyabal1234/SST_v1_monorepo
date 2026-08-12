@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../config/api';
 import {
   IconUsers, IconUserCheck, IconClock, IconCheckCircle, IconXCircle, IconBriefcase, IconEdit, IconFilePlus,
 } from '../../components/Icons';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 const STATUS_META = {
   JOINED: { icon: IconCheckCircle, cls: 'st-joined' },
@@ -96,10 +97,13 @@ export default function HrCandidatesScreen() {
     actualDoj: '',
     remarks: '',
   });
+
   const [saving, setSaving] = useState(false);
   const [loadingRow, setLoadingRow] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  useEscapeKey(modalOpen, () => { if (!saving) setModalOpen(false); });
 
   const loadOnboardings = async () => {
     const res = await get(ENDPOINTS.ONBOARDINGS);

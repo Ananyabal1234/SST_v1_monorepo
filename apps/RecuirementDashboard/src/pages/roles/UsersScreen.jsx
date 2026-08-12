@@ -3,6 +3,7 @@ import { get, post, patch, del } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconUser, IconFilePlus, IconFilter, IconEdit, IconEye, IconEyeOff } from '../../components/Icons';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 const EMPTY_FORM = {
   email: '',
@@ -166,6 +167,8 @@ export default function UsersScreen() {
     setEditSaving(false);
     setShowResetPassword(false);
   };
+
+  useEscapeKey(Boolean(editing), closeEdit);
 
   const saveEdit = async (e) => {
     e.preventDefault();
@@ -353,7 +356,7 @@ export default function UsersScreen() {
       {error && <div className="add-error">{error}</div>}
       {success && <div className="add-success">{success}</div>}
 
-      <div className="table-wrap" style={{ marginBottom: 28 }}>
+      <div className="table-wrap mb-lg">
         <table className="data-table">
           <thead>
             <tr>
@@ -434,17 +437,17 @@ export default function UsersScreen() {
         </div>
       )}
 
-      <div className="assign-head" style={{ marginTop: 12 }}>
+      <div className="page-header mt-md">
         <div>
-          <h2 className="assign-title" style={{ fontSize: 18 }}>Create User</h2>
-          <p className="assign-sub">
+          <h2 className="page-header-title">Create User</h2>
+          <p className="page-header-sub">
             Admin only — create login credentials for Sales, Sales Lead, TA, TA Lead, HR, HR Lead, or Admin.
           </p>
         </div>
       </div>
 
-      <form className="add-form" onSubmit={saveUser} style={{ maxWidth: 560 }}>
-        <div className="detail-grid" style={{ gridTemplateColumns: '1fr' }}>
+      <form className="add-form" onSubmit={saveUser}>
+        <div className="detail-grid single-col">
           <label className="detail-field">
             <span className="detail-label">Email *</span>
             <input
@@ -479,7 +482,7 @@ export default function UsersScreen() {
               ))}
             </select>
             {selectedRole?.description && (
-              <span className="detail-label" style={{ marginTop: 4 }}>{selectedRole.description}</span>
+              <span className="detail-label field-hint">{selectedRole.description}</span>
             )}
           </label>
 
@@ -507,7 +510,7 @@ export default function UsersScreen() {
           </label>
         </div>
 
-        <div style={{ marginTop: 18 }}>
+        <div className="form-actions">
           <button type="submit" className="hr-detail-save" disabled={saving}>
             <IconFilePlus />
             <span>{saving ? 'Creating…' : 'Create User'}</span>
@@ -516,16 +519,26 @@ export default function UsersScreen() {
       </form>
 
       {editing && (
-        <div className="modal-overlay" onClick={closeEdit}>
-          <div className="modal-card detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={closeEdit}
+          role="presentation"
+        >
+          <div
+            className="modal-card detail-modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-user-title"
+          >
             <div className="modal-head">
-              <h3>Edit User — {editing.email}</h3>
-              <button type="button" className="modal-close" onClick={closeEdit} title="Close">×</button>
+              <h3 id="edit-user-title">Edit User — {editing.email}</h3>
+              <button type="button" className="modal-close" onClick={closeEdit} title="Close" aria-label="Close dialog">×</button>
             </div>
             <form onSubmit={saveEdit}>
               <div className="modal-body">
-                {editError && <div className="add-error">{editError}</div>}
-                <div className="detail-grid" style={{ gridTemplateColumns: '1fr' }}>
+                {editError && <div className="add-error" role="alert">{editError}</div>}
+                <div className="detail-grid single-col">
                   <label className="detail-field">
                     <span className="detail-label">Email</span>
                     <input type="email" value={editing.email} readOnly disabled />
@@ -553,7 +566,7 @@ export default function UsersScreen() {
                       ))}
                     </select>
                     {editSelectedRole?.description && (
-                      <span className="detail-label" style={{ marginTop: 4 }}>
+                      <span className="detail-label field-hint">
                         {editSelectedRole.description}
                       </span>
                     )}
@@ -573,7 +586,7 @@ export default function UsersScreen() {
                       <option value="inactive">Inactive</option>
                     </select>
                     {isSelf(editing.id) && (
-                      <span className="detail-label" style={{ marginTop: 4 }}>
+                      <span className="detail-label field-hint">
                         You cannot deactivate your own account.
                       </span>
                     )}

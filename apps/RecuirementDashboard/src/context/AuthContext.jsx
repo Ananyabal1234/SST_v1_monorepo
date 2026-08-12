@@ -65,12 +65,38 @@ export function AuthProvider({ children }) {
           localStorage.setItem('auth_email', res.email);
         })
         .catch(() => {
+          // Access/refresh both dead — clear full session (apiClient may already
+          // have wiped storage after a failed refresh).
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_refresh_token');
           localStorage.removeItem('auth_email');
+          setUser(null);
         })
         .finally(() => setLoading(false));
     } else {
-      setLoading(false);
+      // Stale refresh alone is useless without access token.
+      if (!localStorage.getItem('auth_refresh_token')) {
+        setLoading(false);
+        return;
+      }
+      // Try a silent refresh when only the refresh token remains.
+      post(ENDPOINTS.REFRESH, {
+        refreshToken: localStorage.getItem('auth_refresh_token'),
+      })
+        .then(async (res) => {
+          localStorage.setItem('auth_token', res.accessToken);
+          localStorage.setItem('auth_refresh_token', res.refreshToken);
+          const me = await get(ENDPOINTS.ME);
+          setUser(normalizeUser(me));
+          localStorage.setItem('auth_email', me.email);
+        })
+        .catch(() => {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('auth_refresh_token');
+          localStorage.removeItem('auth_email');
+          setUser(null);
+        })
+        .finally(() => setLoading(false));
     }
   }, []);
 

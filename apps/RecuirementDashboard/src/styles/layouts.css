@@ -1,0 +1,325 @@
+/* =============================================================
+   App shell layout — sidebar, main, topbar, page widths
+   ============================================================= */
+
+.dashboard {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
+  background: var(--bg-soft);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md) var(--space-sm);
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xs) 0 var(--space-md);
+}
+
+.sidebar-brand img,
+.logo {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 60px;
+  object-fit: contain;
+  display: block;
+}
+
+.sidebar-brand img {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35));
+}
+
+[data-theme='dark'] .sidebar-brand img {
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.55));
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.sidebar-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--text-soft);
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: var(--text-ui);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
+  position: relative;
+}
+
+.sidebar-nav button svg { flex: 0 0 auto; }
+
+.sidebar-nav button:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+
+/* Soft active state (2026 SaaS) — primary tint + left accent, not full gradient fill */
+.sidebar-nav button.active {
+  background: var(--brand-tint);
+  color: var(--brand);
+}
+
+.sidebar-nav button.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: var(--radius-full);
+  background: var(--primary);
+}
+
+.sidebar-nav button:focus-visible {
+  box-shadow: var(--shadow-focus);
+}
+
+.sidebar-footer {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: 50%;
+  background: var(--primary-grad);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-weight-bold);
+  color: var(--text-on-primary);
+  font-size: var(--text-card);
+}
+
+.user-meta { min-width: 0; }
+
+.user-chip strong {
+  display: block;
+  font-size: var(--text-ui);
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-chip span {
+  font-size: var(--text-micro);
+  color: var(--text-soft);
+}
+
+.logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-ui);
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.logout-btn:hover { background: var(--hover); }
+.logout-btn:focus-visible { box-shadow: var(--shadow-focus); }
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-lg);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--topbar-min-h);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--border-subtle, var(--border));
+}
+
+.topbar-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: var(--text-page);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+  line-height: var(--leading-tight);
+}
+
+.topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.role-pill {
+  background: var(--primary-grad);
+  color: var(--text-on-primary);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.email {
+  color: var(--text-soft);
+  font-size: var(--text-ui);
+}
+
+/* Page content widths */
+.content-narrow { max-width: var(--content-narrow); }
+.content-wide { max-width: var(--content-wide); }
+
+/* Page header (shared across role screens) */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.page-header-badge {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-grad);
+  color: var(--text-on-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.page-header-badge svg {
+  width: 24px;
+  height: 24px;
+}
+
+.page-header-title {
+  margin: 0;
+  font-size: var(--text-page);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+  line-height: var(--leading-tight);
+}
+
+.page-header-sub {
+  margin: 4px 0 0;
+  font-size: var(--text-ui);
+  color: var(--text-soft);
+  line-height: var(--leading-normal);
+}
+
+.page-header-extra {
+  margin-left: auto;
+}
+
+/* Legacy page header aliases → page header tokens */
+.add-request-head,
+.assign-head,
+.yr-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.add-request-badge,
+.assign-badge,
+.yr-badge {
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary-grad);
+  color: var(--text-on-primary);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 28%, transparent);
+}
+
+.add-request-badge svg,
+.assign-badge svg,
+.yr-badge svg {
+  width: 24px;
+  height: 24px;
+}
+
+.add-request-title,
+.assign-title,
+.yr-title {
+  margin: 0;
+  font-size: var(--text-page);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text);
+}
+
+.add-request-sub,
+.assign-sub,
+.yr-sub {
+  margin: 4px 0 0;
+  font-size: var(--text-ui);
+  color: var(--text-soft);
+}
+
+.add-request { max-width: var(--content-narrow); }
+.assign-task,
+.hr-candidates,
+.yr-screen { max-width: var(--content-wide); }
+
+.screen-title {
+  font-size: var(--text-section);
+  font-weight: var(--font-weight-semibold);
+  margin: 0 0 var(--space-md);
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .main { padding: var(--space-md); }
+}

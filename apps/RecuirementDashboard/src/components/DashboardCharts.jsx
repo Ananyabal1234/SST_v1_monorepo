@@ -3,14 +3,32 @@ import {
   IconChart, IconPie, IconBar,
 } from './Icons';
 
-// BR brand palette for charts (theme-aware via CSS variables)
-const BR = '#e11d2f';
-const BR_LIGHT = '#ff4d5e';
+// Semantic chart colors (danger is NOT brand primary — brand stays sky #0ea5e9)
+const FALLBACK = {
+  success: '#16a34a',
+  successBright: '#4ade80',
+  warning: '#f59e0b',
+  danger: '#dc2626',
+  primary: '#0ea5e9',
+};
 
 // Read theme colors from CSS variables so charts match dark/light mode.
-function cssVar(name) {
-  if (typeof window === 'undefined') return '#888';
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888';
+function cssVar(name, fallback = '#888') {
+  if (typeof window === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+function semanticColors() {
+  return {
+    success: cssVar('--color-success', FALLBACK.success),
+    successBright: cssVar('--color-success-bright', FALLBACK.successBright),
+    warning: cssVar('--color-warning-bright', FALLBACK.warning),
+    danger: cssVar('--color-danger', FALLBACK.danger),
+    primary: cssVar('--primary', FALLBACK.primary),
+    ragGreen: cssVar('--rag-green-fg', FALLBACK.success),
+    ragAmber: cssVar('--rag-amber-fg', FALLBACK.warning),
+    ragRed: cssVar('--rag-red-fg', FALLBACK.danger),
+  };
 }
 
 // ---- Aggregate helpers (computed from the dashboard rows) ----
@@ -20,7 +38,7 @@ function byClient(rows, field) {
   return Object.entries(map).map(([client, value]) => ({ client, value }));
 }
 
-function normalizeRagSummary(summary) {
+function normalizeRagSummary(summary, colors) {
   if (!Array.isArray(summary)) return null;
   const map = { Green: 0, Amber: 0, Red: 0 };
   summary.forEach((item) => {
@@ -30,19 +48,19 @@ function normalizeRagSummary(summary) {
     if (key.toLowerCase() === 'red') map.Red += Number(item.count || item.value || 0);
   });
   return [
-    { name: 'Green', value: map.Green, color: '#16a34a' },
-    { name: 'Amber', value: map.Amber, color: '#f59e0b' },
-    { name: 'Red', value: map.Red, color: BR },
+    { name: 'Green', value: map.Green, color: colors.success },
+    { name: 'Amber', value: map.Amber, color: colors.warning },
+    { name: 'Red', value: map.Red, color: colors.danger },
   ];
 }
 
-function ragBreakdown(rows) {
+function ragBreakdown(rows, colors) {
   const map = { Green: 0, Amber: 0, Red: 0 };
   rows.forEach((r) => { if (map[r.requirementRag] != null) map[r.requirementRag]++; });
   return [
-    { name: 'Green', value: map.Green, color: '#16a34a' },
-    { name: 'Amber', value: map.Amber, color: '#f59e0b' },
-    { name: 'Red', value: map.Red, color: BR },
+    { name: 'Green', value: map.Green, color: colors.success },
+    { name: 'Amber', value: map.Amber, color: colors.warning },
+    { name: 'Red', value: map.Red, color: colors.danger },
   ];
 }
 
@@ -56,12 +74,12 @@ function pipelineFunnel(rows) {
   ];
 }
 
-function positionStatus(rows) {
+function positionStatus(rows, colors) {
   const open = rows.reduce((s, r) => s + (r.openPositions || 0), 0);
   const closed = rows.reduce((s, r) => s + (r.closedPositions || 0), 0);
   return [
-    { name: 'Open', value: open, color: '#4ade80' },
-    { name: 'Closed', value: closed, color: BR },
+    { name: 'Open', value: open, color: colors.successBright },
+    { name: 'Closed', value: closed, color: colors.danger },
   ];
 }
 
@@ -69,9 +87,10 @@ export default function DashboardCharts({ rows, kpis = [], openPositionsOnClient
   const { theme } = useTheme();
   // `theme` is referenced so the component re-renders on toggle.
   void theme;
+  const colors = semanticColors();
 
   // When API returns summary-only response (no rows), use kpis from summary
-  const ragFromSummary = normalizeRagSummary(requirementRagSummary);
+  const ragFromSummary = normalizeRagSummary(requirementRagSummary, colors);
   const effectiveRows = rows.length ? rows : kpis.map((k) => ({
     client: k.label,
     openPositions: k.label === 'openPositions' ? k.value : 0,
@@ -94,9 +113,9 @@ export default function DashboardCharts({ rows, kpis = [], openPositionsOnClient
     : closedPositionsOnClient.length
       ? closedPositionsOnClient.map((c) => ({ client: c.client, value: c.closedPositions })).sort((a, b) => b.value - a.value).slice(0, 6)
       : [];
-  const rag = ragFromSummary || ragBreakdown(effectiveRows);
+  const rag = ragFromSummary || ragBreakdown(effectiveRows, colors);
   const funnel = pipelineFunnel(effectiveRows);
-  const status = positionStatus(effectiveRows);
+  const status = positionStatus(effectiveRows, colors);
 
   const maxClient = Math.max(1, ...openByClient.map((d) => d.value));
   const maxClosed = Math.max(1, ...closedByClient.map((d) => d.value));

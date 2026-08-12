@@ -9,6 +9,7 @@ import {
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 import DuplicateCandidatePanel from '../../components/DuplicateCandidatePanel';
 import { formatTaOwnerNames } from '../../components/TaOwnersMultiSelect';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 const FALLBACK_STAGES = [
   { code: 'SUBMITTED_TO_SPOC', label: 'Submitted to SPOC' },
@@ -330,6 +331,7 @@ export default function AssignTaskScreen() {
   };
   const openCandidateDetails = (candidate) => setViewingCandidate(candidate);
   const closeCandidateDetails = () => setViewingCandidate(null);
+  useEscapeKey(Boolean(viewingCandidate), closeCandidateDetails);
 
   const update = (key, value) => {
     setForm((f) => {
@@ -525,7 +527,7 @@ export default function AssignTaskScreen() {
                   <h3 className="task-detail-title">{selectedTask.clientName} — {selectedTask.position}</h3>
                   <span className="task-detail-id">{selectedTask.publicId || selectedTask.id}</span>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className="inline-actions">
                   <button
                     type="button"
                     className="filter-clear"

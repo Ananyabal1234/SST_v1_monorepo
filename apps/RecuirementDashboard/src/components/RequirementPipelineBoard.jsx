@@ -148,7 +148,10 @@ export default function RequirementPipelineBoard({
                         role="button"
                         tabIndex={0}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') onViewCandidate?.(c);
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onViewCandidate?.(c);
+                          }
                         }}
                       >
                         <div className="pipeline-card-name">{c.name || c.candidateName || '—'}</div>

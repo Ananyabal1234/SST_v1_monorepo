@@ -61,15 +61,23 @@ function getKpiLabel(kpi) {
   return KPI_LABELS[kpi.label] || kpi.label || 'KPI';
 }
 
+function cssVar(name, fallback) {
+  if (typeof window === 'undefined') return fallback;
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
 export default function KpiCards({ kpis = [], onCardClick }) {
+  const successLight = cssVar('--color-success-light', '#22c55e');
+  const success = cssVar('--color-success', '#16a34a');
+
   return (
     <div className="kpi-grid">
-      {/* Shared gradient for the radial progress rings */}
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
+      {/* Shared gradient for the radial progress rings — uses semantic success tokens */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
           <linearGradient id="kpiGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#22c55e" />
-            <stop offset="100%" stopColor="#16a34a" />
+            <stop offset="0%" stopColor={successLight} />
+            <stop offset="100%" stopColor={success} />
           </linearGradient>
         </defs>
       </svg>
@@ -83,7 +91,13 @@ export default function KpiCards({ kpis = [], onCardClick }) {
             role={onCardClick ? 'button' : undefined}
             tabIndex={onCardClick ? 0 : undefined}
             onClick={() => onCardClick && onCardClick(label)}
-            onKeyDown={(e) => { if (e.key === 'Enter') onCardClick && onCardClick(label); }}
+            onKeyDown={(e) => {
+              if (!onCardClick) return;
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onCardClick(label);
+              }
+            }}
           >
             <div className="kpi-top">
               <span className="kpi-icon"><Icon /></span>

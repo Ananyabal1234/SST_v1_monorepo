@@ -1,0 +1,175 @@
+/* =============================================================
+   SST Design Tokens — primary brand #0ea5e9 preserved
+   ============================================================= */
+
+:root {
+  /* Primary scale (sky blue brand) */
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+
+  /* Brand aliases (legacy + new) */
+  --brand: var(--color-primary-500);
+  --brand-dark: var(--color-primary-600);
+  --brand-light: var(--color-primary-400);
+  --brand-2: var(--color-primary-300);
+  --primary: var(--color-primary-500);
+  --primary-grad: linear-gradient(135deg, var(--color-primary-500), var(--color-primary-400));
+
+  /* Semantic success / warning / danger / info */
+  --color-success: #16a34a;
+  --color-success-light: #22c55e;
+  --color-success-bright: #4ade80;
+  --color-success-dark: #15803d;
+  --color-warning: #d97706;
+  --color-warning-bright: #f59e0b;
+  --color-danger: #dc2626;
+  --color-danger-bright: #ef4444;
+  --color-info: var(--color-primary-500);
+
+  /* Typography scale */
+  --text-display: 28px;
+  --text-page: 20px;
+  --text-section: 16px;
+  --text-card: 14px;
+  --text-body: 14px;
+  --text-ui: 13px;
+  --text-label: 12px;
+  --text-caption: 12px;
+  --text-micro: 11px;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  /* Spacing (8-point system) */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Control metrics */
+  --control-height: 40px;
+  --control-height-sm: 32px;
+  --control-pad-y: 10px;
+  --control-pad-x: 12px;
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+  --radius: var(--radius-lg); /* legacy alias */
+
+  /* Layout */
+  --sidebar-width: 180px;
+  --topbar-min-h: 56px;
+  --content-narrow: 920px;
+  --content-wide: 1200px;
+
+  /* Motion */
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 250ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* ---------- DARK analytics theme (default) ---------- */
+[data-theme='dark'] {
+  --brand-tint: #0a2233;
+  --bg: #0b0f12;
+  --bg-soft: #11181d;
+  --surface: #16212a;
+  --surface-2: #1d2b36;
+  --border: #243640;
+  --border-subtle: #1a2830;
+  --text: #f0f7fb;
+  --text-soft: #8aa6b8;
+  --text-muted: #6b8494;
+  --text-primary: var(--text);
+  --text-secondary: var(--text-soft);
+  --text-on-primary: #ffffff;
+  --bg-app: var(--bg);
+  --bg-surface: var(--surface);
+  --bg-surface-hover: #ffffff0d;
+  --hover: #ffffff0d;
+  --overlay: rgba(8, 18, 28, 0.6);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --shadow: var(--shadow-sm);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--primary) 35%, transparent);
+  --focus-ring-color: color-mix(in srgb, var(--primary) 35%, transparent);
+
+  --grid: #243640;
+  --axis: #8aa6b8;
+  --tooltip-bg: #16212a;
+  --card-grad: linear-gradient(135deg, #16212a, #0a2233);
+  --kpi-grad: linear-gradient(135deg, var(--color-success-light), var(--color-success));
+  --rag-green-bg: #14331f; --rag-green-fg: #4ade80;
+  --rag-amber-bg: #3a2e10; --rag-amber-fg: #fbbf24;
+  --rag-red-bg: #3a0d10;   --rag-red-fg: #ff8a93;
+  --stage-bg: #2a1d33;     --stage-fg: #c4b5fd;
+  --success-task-tint: color-mix(in srgb, var(--color-success-light) 22%, var(--surface));
+  --success-task-border: color-mix(in srgb, var(--color-success-light) 45%, var(--border));
+}
+
+/* ---------- LIGHT theme ---------- */
+[data-theme='light'] {
+  --brand-tint: #e0f2fe;
+  --bg: #f4f9fd;
+  --bg-soft: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f0f9ff;
+  --border: #d6eaf6;
+  --border-subtle: #e8f2f9;
+  --text: #0c2a3a;
+  --text-soft: #5b7c91;
+  --text-muted: #7a96a8;
+  --text-primary: var(--text);
+  --text-secondary: var(--text-soft);
+  --text-on-primary: #ffffff;
+  --bg-app: var(--bg);
+  --bg-surface: var(--surface);
+  --bg-surface-hover: #e0f2fe;
+  --hover: #e0f2fe;
+  --overlay: rgba(8, 18, 28, 0.5);
+
+  --shadow-xs: 0 1px 2px rgba(14, 165, 233, 0.04);
+  --shadow-sm: 0 1px 3px rgba(14, 165, 233, 0.08), 0 1px 2px rgba(12, 42, 58, 0.04);
+  --shadow-md: 0 4px 12px rgba(14, 165, 233, 0.12);
+  --shadow-lg: 0 12px 32px rgba(12, 42, 58, 0.14);
+  --shadow: var(--shadow-sm);
+  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--primary) 30%, transparent);
+  --focus-ring-color: color-mix(in srgb, var(--primary) 30%, transparent);
+
+  --grid: #e6f2fa;
+  --axis: #5b7c91;
+  --tooltip-bg: #ffffff;
+  --card-grad: linear-gradient(135deg, #ffffff, #e0f2fe);
+  --kpi-grad: linear-gradient(135deg, var(--color-success-light), var(--color-success));
+  --rag-green-bg: #dcfce7; --rag-green-fg: #166534;
+  --rag-amber-bg: #fef3c7; --rag-amber-fg: #92400e;
+  --rag-red-bg: #fee2e2;   --rag-red-fg: #991b1b;
+  --stage-bg: #e0e7ff;     --stage-fg: #3730a3;
+  --success-task-tint: color-mix(in srgb, var(--color-success) 10%, var(--surface));
+  --success-task-border: color-mix(in srgb, var(--color-success) 35%, var(--border));
+}

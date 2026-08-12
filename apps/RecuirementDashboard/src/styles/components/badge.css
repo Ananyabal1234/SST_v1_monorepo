@@ -1,0 +1,256 @@
+/* =============================================================
+   Badges, chips, status pills
+   ============================================================= */
+
+.badge,
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+}
+
+.badge.rag.green,
+.status-success { background: var(--rag-green-bg); color: var(--rag-green-fg); }
+.badge.rag.amber,
+.status-warning { background: var(--rag-amber-bg); color: var(--rag-amber-fg); }
+.badge.rag.red,
+.status-danger { background: var(--rag-red-bg); color: var(--rag-red-fg); }
+.badge.stage,
+.status-info { background: var(--stage-bg); color: var(--stage-fg); }
+
+/* Filter bar */
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+}
+
+.filter-bar-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-ui);
+  font-weight: var(--font-weight-bold);
+  color: var(--text);
+}
+
+.filter-bar-head svg { color: var(--brand); }
+
+.filter-count {
+  margin-left: 6px;
+  font-size: var(--text-micro);
+  font-weight: var(--font-weight-bold);
+  color: var(--brand);
+  background: var(--brand-tint);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+.filter-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.users-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -12px 0 var(--space-lg);
+}
+
+.users-pager .filter-clear { margin-left: 0; }
+.users-pager-meta {
+  font-size: var(--text-ui);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-soft);
+}
+
+.users-row-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* HR chips */
+.hr-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: var(--space-md);
+}
+
+.hr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: var(--text-ui);
+  font-weight: var(--font-weight-semibold);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    background var(--duration-fast) var(--ease-out);
+}
+
+.hr-chip svg { width: 15px; height: 15px; }
+
+.hr-chip em {
+  font-style: normal;
+  background: var(--bg-soft);
+  color: var(--text-soft);
+  font-size: var(--text-micro);
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+}
+
+.hr-chip:hover {
+  border-color: var(--brand);
+  color: var(--text);
+}
+
+.hr-chip.active {
+  border-color: var(--brand);
+  color: var(--text-on-primary);
+  background: var(--primary-grad);
+}
+
+.hr-chip.active em {
+  background: #ffffff33;
+  color: #fff;
+}
+
+.hr-chip:focus-visible { box-shadow: var(--shadow-focus); }
+
+.st-pipeline { color: var(--stage-fg); }
+.st-pending { color: var(--rag-amber-fg); }
+.st-selected { color: var(--rag-green-fg); }
+.st-offer { color: var(--brand-light); }
+.st-rejected { color: var(--rag-red-fg); }
+.st-joined { color: var(--brand-light); }
+.st-all { color: var(--text-soft); }
+
+.hr-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hr-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.hr-status-badge svg { width: 13px; height: 13px; }
+.hr-status-badge.st-pipeline { color: var(--stage-fg); border-color: var(--stage-bg); }
+.hr-status-badge.st-pending { color: var(--rag-amber-fg); border-color: var(--rag-amber-bg); }
+.hr-status-badge.st-selected { color: var(--rag-green-fg); border-color: var(--rag-green-bg); }
+.hr-status-badge.st-offer { color: var(--brand-light); border-color: var(--brand-tint); }
+.hr-status-badge.st-rejected { color: var(--rag-red-fg); border-color: var(--rag-red-bg); }
+.hr-status-badge.st-joined { color: var(--brand-light); border-color: var(--brand-tint); }
+
+/* Your Requirements statuses */
+.yr-count {
+  margin-left: auto;
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--brand);
+  background: var(--brand-tint);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+
+.yr-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-caption);
+  font-weight: var(--font-weight-bold);
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+}
+
+.yr-status.submitted,
+.yr-status.active {
+  color: var(--rag-green-fg);
+  border-color: var(--rag-green-bg);
+  background: var(--rag-green-bg);
+}
+
+.yr-status.pending,
+.yr-status.on_hold {
+  color: var(--rag-amber-fg);
+  border-color: var(--rag-amber-bg);
+  background: var(--rag-amber-bg);
+}
+
+.yr-status.closed {
+  color: var(--text-muted);
+  border-color: var(--border);
+  background: var(--bg-soft);
+}
+
+.yr-status.cancelled {
+  color: var(--rag-red-fg);
+  border-color: var(--rag-red-bg);
+  background: var(--rag-red-bg);
+}
+
+.yr-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.yr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: var(--space-2xl) 20px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-soft);
+}
+
+.yr-empty svg {
+  width: 34px;
+  height: 34px;
+  color: var(--brand);
+  opacity: 0.7;
+}
+
+.yr-empty p { margin: 0; font-size: var(--text-body); }
+.yr-empty a {
+  color: var(--brand);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  text-decoration: none;
+}
+.yr-empty a:hover { text-decoration: underline; }

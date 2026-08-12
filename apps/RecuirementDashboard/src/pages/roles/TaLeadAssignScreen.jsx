@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../config/api';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconUser } from '../../components/Icons';
 import TaOwnersMultiSelect, { formatTaOwnerNames, formatTaLeadNames } from '../../components/TaOwnersMultiSelect';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 /** TA Lead workspace: view all requirements, assign TA owners, view pipelines. */
 export default function TaLeadAssignScreen() {
@@ -132,6 +133,11 @@ export default function TaLeadAssignScreen() {
     setAssignError(null);
     setAssignSuccess(null);
   };
+  useEscapeKey(Boolean(assigning), closeAssign);
+  useEscapeKey(Boolean(viewingRequirement), () => {
+    setViewingRequirement(null);
+    setViewingCandidate(null);
+  });
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -394,7 +400,7 @@ export default function TaLeadAssignScreen() {
                 onSelectCandidate={setViewingCandidate}
               />
               {viewingCandidate && (
-                <div className="detail-grid" style={{ marginTop: 16 }}>
+                <div className="detail-grid mt-md">
                   <div className="detail-item">
                     <span className="detail-label">Candidate</span>
                     <span className="detail-value">{viewingCandidate.name || '—'}</span>

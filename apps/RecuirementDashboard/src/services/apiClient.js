@@ -10,6 +10,21 @@ const client = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+/** Endpoints that must never trigger the auto-refresh loop. */
+function isAuthPassThrough(url = '') {
+  return (
+    url.includes('/auth/login') ||
+    url.includes('/auth/refresh') ||
+    url.includes('/auth/logout')
+  );
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('auth_refresh_token');
+  localStorage.removeItem('auth_email');
+}
+
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('auth_token');
   if (token) {
@@ -30,6 +45,9 @@ client.interceptors.request.use((config) => {
 //  Auto-refresh on 401. When the access token expires, we call /auth/refresh
 //  with the stored refresh token, update storage, and retry the original
 //  request once. Avoids bouncing the user to login on every expiry.
+//
+//  Uses a bare axios call (not `client`) for refresh so a 401 refresh response
+//  cannot re-enter this interceptor (which previously deadlocked).
 // ---------------------------------------------------------------------------
 let isRefreshing = false;
 let pendingQueue = [];
@@ -37,6 +55,13 @@ let pendingQueue = [];
 function flushQueue(error) {
   pendingQueue.forEach((p) => (error ? p.reject(error) : p.resolve()));
   pendingQueue = [];
+}
+
+function redirectToLogin() {
+  // Hard navigation clears React auth state after a dead session.
+  if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
+    window.location.assign('/login');
+  }
 }
 
 client.interceptors.response.use(
@@ -50,9 +75,26 @@ client.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const original = error.config;
+    const original = error.config || {};
+    const status = error.response?.status;
+    const url = original.url || '';
+
+    // Auth endpoints: surface the error as-is (login failed / refresh invalid).
+    if (isAuthPassThrough(url)) {
+      if (status === 401 && url.includes('/auth/refresh')) {
+        console.warn('[auth] Refresh token rejected — session expired. Sign in again.');
+        clearAuthStorage();
+      }
+      console.log(
+        `%c[API ERROR] ${status || ''} ${original.method?.toUpperCase()} ${url}`,
+        'color:#dc2626;font-weight:bold',
+        error.response?.data ?? error.message
+      );
+      return Promise.reject(error);
+    }
+
     // Only attempt refresh once per request and only on 401.
-    if (error.response?.status === 401 && !original._retry) {
+    if (status === 401 && !original._retry) {
       if (isRefreshing) {
         // Another refresh is in flight — wait for it, then retry.
         return new Promise((resolve, reject) => {
@@ -64,7 +106,7 @@ client.interceptors.response.use(
             if (token) original.headers.Authorization = `Bearer ${token}`;
             return client(original);
           })
-          .catch(() => Promise.reject(error));
+          .catch((err) => Promise.reject(err || error));
       }
 
       original._retry = true;
@@ -73,10 +115,18 @@ client.interceptors.response.use(
       const refreshToken = localStorage.getItem('auth_refresh_token');
       try {
         if (!refreshToken) throw new Error('No refresh token');
-        const { data } = await client.post(
-          ENDPOINTS.REFRESH,
-          { refreshToken }
+
+        // Bare axios — bypass this interceptor to avoid recursive refresh.
+        const { data } = await axios.post(
+          `${API_BASE_URL}${ENDPOINTS.REFRESH}`,
+          { refreshToken },
+          {
+            baseURL: undefined,
+            timeout: API_TIMEOUT,
+            headers: { 'Content-Type': 'application/json' },
+          }
         );
+
         localStorage.setItem('auth_token', data.accessToken);
         localStorage.setItem('auth_refresh_token', data.refreshToken);
         flushQueue(null);
@@ -85,17 +135,17 @@ client.interceptors.response.use(
         return client(original);
       } catch (refreshErr) {
         flushQueue(refreshErr);
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_refresh_token');
-        localStorage.removeItem('auth_email');
+        clearAuthStorage();
+        redirectToLogin();
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
       }
     }
-    // Log non-401 errors (4xx/5xx that aren't auto-refreshed).
+
+    // Log non-401 errors (and non-refreshable 401s).
     console.log(
-      `%c[API ERROR] ${error.response?.status || ''} ${error.config?.method?.toUpperCase()} ${error.config?.url}`,
+      `%c[API ERROR] ${status || ''} ${original.method?.toUpperCase()} ${url}`,
       'color:#dc2626;font-weight:bold',
       error.response?.data ?? error.message
     );

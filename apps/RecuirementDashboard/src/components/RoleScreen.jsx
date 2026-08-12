@@ -3,6 +3,7 @@ import { get } from '../services/apiClient';
 import { ENDPOINTS } from '../config/api';
 import KpiCards from './KpiCards';
 import DataTable from './DataTable';
+import { Skeleton, SkeletonBlock } from './ui';
 
 // Generic role screen. Pass the endpoint key + a title.
 // Each role screen hits its OWN API endpoint (see config/api.js).
@@ -22,8 +23,12 @@ export default function RoleScreen({ endpointKey, title }) {
 
   if (loading) {
     return (
-      <div className="screen-loading">
-        <div className="spinner" />
+      <div className="role-screen" aria-busy="true" aria-label="Loading">
+        <Skeleton variant="short" className="mb-lg" style={{ height: 24, width: 180 }} />
+        <div className="kpi-grid">
+          {[1, 2, 3, 4].map((i) => <Skeleton key={i} variant="card" />)}
+        </div>
+        <SkeletonBlock rows={5} />
       </div>
     );
   }

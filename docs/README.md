@@ -8,10 +8,13 @@ Complete enterprise documentation for building **Service Staffing Tracker (SST)*
 
 | Audience | Start here |
 |----------|------------|
-| New engineers | [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) |
+| Team Lead / new engineers (high-level overview) | [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) |
+| Beginners — high-level architecture (plain language) | [06-system-design/BEGINNER_HIGH_LEVEL_ARCHITECTURE.md](./06-system-design/BEGINNER_HIGH_LEVEL_ARCHITECTURE.md) |
 | New to Node.js / NestJS | [21-guides/NESTJS_DEVELOPER_HANDBOOK.md](./21-guides/NESTJS_DEVELOPER_HANDBOOK.md) |
+| Big-picture diagrams (beginner) | [06-system-design/BEGINNER_ARCHITECTURE_DIAGRAMS.md](./06-system-design/BEGINNER_ARCHITECTURE_DIAGRAMS.md) |
 | Product / BA | [00-initiation/VISION.md](./00-initiation/VISION.md) |
 | Architects | [06-system-design/HIGH_LEVEL_ARCHITECTURE.md](./06-system-design/HIGH_LEVEL_ARCHITECTURE.md) |
+| Enterprise HLA diagrams (C4 / posters) | [06-system-design/ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md](./06-system-design/ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md) |
 | Security | [11-security/AUTH_RBAC.md](./11-security/AUTH_RBAC.md) |
 | QA / SDET | [15-testing/TESTING_STRATEGY.md](./15-testing/TESTING_STRATEGY.md) |
 | Ops | [17-local-deployment/LOCAL_SETUP.md](./17-local-deployment/LOCAL_SETUP.md) |
@@ -27,7 +30,7 @@ Complete enterprise documentation for building **Service Staffing Tracker (SST)*
 
 ## Reading order (recommended)
 
-1. [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — day-1 orientation  
+1. [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — enterprise high-level engineering overview (Team Lead onboarding)  
 2. [00-initiation](./00-initiation/) → [01-business-analysis](./01-business-analysis/) → [02-srs](./02-srs/) → [03-prd](./03-prd/)  
 3. [04-domain](./04-domain/) → [05-ux](./05-ux/)  
 4. [06-system-design](./06-system-design/) → [07-database](./07-database/) → [08-backend](./08-backend/) → [09-frontend](./09-frontend/) → [10-api](./10-api/) → [11-security](./11-security/)  
@@ -45,7 +48,7 @@ Complete enterprise documentation for building **Service Staffing Tracker (SST)*
 | `03-prd` | Product Requirements Document |
 | `04-domain` | Domain model, processes, future modules |
 | `05-ux` | IA, flows, wireframes, design system |
-| `06-system-design` | HLA, C4, sequences, data flow, deployment, scale |
+| `06-system-design` | Enterprise HLA diagrams, beginner HLA, beginner diagrams, HLA, C4, sequences, data flow, deployment, scale |
 | `07-database` | ER/schema, Prisma, indexes/audit, migrations |
 | `08-backend` | NestJS architecture, modules, cross-cutting |
 | `09-frontend` | React architecture, features, auth/routing, state |

@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 import TaOwnersMultiSelect, { formatTaOwnerNames, formatTaLeadNames } from '../../components/TaOwnersMultiSelect';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 function normalizeMemberList(res) {
   if (Array.isArray(res)) return res;
@@ -262,6 +263,9 @@ export default function YourRequirementsScreen() {
   const closeEdit = () => { setEditing(null); setForm({}); };
   const openRequirementDetails = (requirement) => { setViewingRequirement(requirement); };
   const closeRequirementDetails = () => { setViewingRequirement(null); setViewingCandidate(null); };
+  useEscapeKey(Boolean(editing), closeEdit);
+  useEscapeKey(Boolean(viewingRequirement && !editing), closeRequirementDetails);
+  useEscapeKey(Boolean(viewingCandidate && !viewingRequirement && !editing), () => setViewingCandidate(null));
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -541,7 +545,7 @@ export default function YourRequirementsScreen() {
                 <div className="detail-item"><span className="detail-label">Offer</span><span className="detail-value">{viewingCandidate.offer?.statusCode || '—'}</span></div>
                 <div className="detail-item"><span className="detail-label">Onboarding</span><span className="detail-value">{viewingCandidate.onboarding?.statusCode || '—'}</span></div>
               </div>
-              <div className="detail-description" style={{ marginTop: 12 }}>{viewingCandidate.remarks || 'No remarks.'}</div>
+              <div className="detail-description mt-sm">{viewingCandidate.remarks || 'No remarks.'}</div>
             </div>
             <div className="modal-foot">
               <button className="filter-clear" type="button" onClick={() => setViewingCandidate(null)}>Close</button>
@@ -618,7 +622,7 @@ export default function YourRequirementsScreen() {
                     <span className="detail-label">TA assignment</span>
                     {canAssignTas ? (
                       <>
-                        <div className="assign-mode-row" style={{ marginBottom: 8 }}>
+                        <div className="assign-mode-row mb-sm">
                           <label className={`assign-mode-opt${assignMode === 'none' ? ' is-active' : ''}`}>
                             <input
                               type="radio"
@@ -676,12 +680,11 @@ export default function YourRequirementsScreen() {
                               ariaLabel="TA Leads"
                             />
                             {taLeadLoadError && (
-                              <div className="add-error" style={{ marginTop: 8 }}>
+                              <div className="add-error mt-sm inline-actions">
                                 {taLeadLoadError}
                                 <button
                                   type="button"
                                   className="filter-clear"
-                                  style={{ marginLeft: 8 }}
                                   onClick={() => void loadTaLeadOptions()}
                                 >
                                   Retry

@@ -66,9 +66,13 @@ export default function Login() {
             />
           </label>
 
-          {error && <div className="login-error">{error}</div>}
+          {error && (
+            <div className="login-error" role="alert" aria-live="assertive">
+              {error}
+            </div>
+          )}
 
-          <button type="submit" disabled={submitting}>
+          <button type="submit" className="btn btn-primary btn-lg" disabled={submitting}>
             {submitting ? 'Signing in…' : 'Sign In'}
           </button>
         </form>

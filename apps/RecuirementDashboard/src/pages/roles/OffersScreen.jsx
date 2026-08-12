@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { get, patch } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { IconCheckCircle, IconFilePlus, IconEdit } from '../../components/Icons';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 const HR_OFFER_STATUS_CODES = ['RELEASED', 'ACCEPTED', 'DECLINED', 'HOLD', 'BACKOUT'];
 const FALLBACK_OFFER_STATUSES = [
@@ -81,6 +82,8 @@ export default function OffersScreen() {
   const [loadingOffer, setLoadingOffer] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+
+  useEscapeKey(modalOpen, () => { if (!saving) setModalOpen(false); });
 
   const loadOffers = async () => {
     const res = await get(ENDPOINTS.OFFERS);

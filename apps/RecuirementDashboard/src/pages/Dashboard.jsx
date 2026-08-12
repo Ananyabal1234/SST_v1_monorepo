@@ -12,6 +12,7 @@ import { DASHBOARD_COLUMNS } from '../config/columns';
 import {
   IconDashboard, IconSun, IconMoon, IconLogout, IconPlus, IconClipboardCheck, IconUsers, IconList, IconCheckCircle, IconUser,
 } from '../components/Icons';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import SalesScreen from './roles/SalesScreen';
 import TaOwnerScreen from './roles/TaOwnerScreen';
 import HrScreen from './roles/HrScreen';
@@ -507,6 +508,7 @@ export default function Dashboard() {
 
 // Modal listing the rows that make up a clicked KPI.
 function KpiModal({ kpi, onClose }) {
+  useEscapeKey(true, onClose);
   const key = kpi.label;
   const listKey = kpi.listKey;
   const items = Array.isArray(kpi.rows) ? kpi.rows : [];
@@ -519,7 +521,7 @@ function KpiModal({ kpi, onClose }) {
   const formatHeader = (header) => header
     .replace(/([A-Z])/g, ' $1')
     .replace(/_/g, ' ')
-    .replace(/\w/g, (m) => m.toUpperCase());
+    .replace(/\b\w/g, (m) => m.toUpperCase());
 
   const UUID_LIKE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const HIDDEN_KEYS = new Set([
@@ -568,11 +570,17 @@ function KpiModal({ kpi, onClose }) {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card modal-large" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} role="presentation">
+      <div
+        className="modal-card modal-large"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="kpi-modal-title"
+      >
         <div className="modal-head">
-          <h3>{getKpiLabel({ label: key })} Details — {totalValue} total</h3>
-          <button className="modal-close" onClick={onClose} title="Close">×</button>
+          <h3 id="kpi-modal-title">{getKpiLabel({ label: key })} Details — {totalValue} total</h3>
+          <button type="button" className="modal-close" onClick={onClose} title="Close" aria-label="Close dialog">×</button>
         </div>
         <div className="modal-body">
           {sortedItems.length === 0 && <p className="modal-empty">No records for this metric.</p>}

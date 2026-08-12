@@ -6,6 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import TaOwnersMultiSelect from '../../components/TaOwnersMultiSelect';
 import { IconBriefcase, IconUser, IconTarget, IconFolderOpen, IconWallet, IconMapPin, IconClock, IconPlus, IconCalendar, IconFlag } from '../../components/Icons';
 
+import { PageHeader } from '../../components/ui';
+
 const EMPTY = {
   requirementDate: '',
   clientName: '',
@@ -287,15 +289,11 @@ export default function AddRequestScreen() {
 
   return (
     <div className="add-request">
-      <div className="add-request-head">
-        <span className="add-request-badge"><IconPlus /></span>
-        <div>
-          <h2 className="add-request-title">Add Recruitment Request</h2>
-          <p className="add-request-sub">
-            Fill in the details below. Optionally assign via TA Lead or directly to TA owner(s).
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        icon={IconPlus}
+        title="Add Recruitment Request"
+        subtitle="Fill in the details below. Optionally assign via TA Lead or directly to TA owner(s)."
+      />
 
       <form className="add-request-form" onSubmit={handleSubmit}>
         <div className="add-request-grid">
@@ -418,12 +416,11 @@ export default function AddRequestScreen() {
                   ariaLabel="TA Leads"
                 />
                 {taLeadLoadError && (
-                  <div className="add-error" style={{ marginTop: 8 }}>
+                  <div className="add-error mt-sm inline-actions">
                     {taLeadLoadError}
                     <button
                       type="button"
                       className="filter-clear"
-                      style={{ marginLeft: 8 }}
                       onClick={() => void loadTaLeadMembers()}
                     >
                       Retry

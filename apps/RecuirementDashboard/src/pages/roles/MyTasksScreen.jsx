@@ -4,6 +4,7 @@ import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconBriefcase, IconClipboardCheck } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 
 export default function MyTasksScreen() {
   const { user } = useAuth();
@@ -11,6 +12,11 @@ export default function MyTasksScreen() {
   const [loading, setLoading] = useState(true);
   const [pipelineReq, setPipelineReq] = useState(null);
   const [viewingCandidate, setViewingCandidate] = useState(null);
+
+  useEscapeKey(Boolean(pipelineReq || viewingCandidate), () => {
+    if (viewingCandidate) setViewingCandidate(null);
+    else setPipelineReq(null);
+  });
 
   useEffect(() => {
     let active = true;

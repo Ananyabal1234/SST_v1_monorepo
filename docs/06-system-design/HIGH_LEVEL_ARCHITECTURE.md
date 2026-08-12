@@ -25,26 +25,33 @@ Local/Docker modular monolith. Cloud in `19-cloud`.
 
 - Enterprise monorepo (Turborepo)  
 - Modular monolith NestJS API  
-- React SPA  
+- React SPA (`apps/RecuirementDashboard`)  
 - PostgreSQL SoR  
 - Clean / layered architecture inside modules  
 - Future Redis / object storage adapters  
 
+**Primary visual boards:** [ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md](./ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md) (Fig 2 = main container HLA).
+
 ```mermaid
 flowchart TB
-  Browser[Browser_SPA]
-  API[NestJS_API]
-  DB[(PostgreSQL)]
-  Files[Local_File_Storage]
-  Prom[Prometheus]
-  Grafana[Grafana]
-  Loki[Loki]
-  Browser -->|REST_JWT| API
-  API --> DB
+  User((User))
+  SPA["Web SPA<br/>React · Vite<br/>apps/RecuirementDashboard"]
+  API["API · Modular monolith<br/>NestJS · Prisma · JWT / RBAC<br/>apps/api"]
+  DB[("PostgreSQL<br/>System of record")]
+  Files["Local file storage"]
+  Prom["Prometheus"]
+  Grafana["Grafana"]
+  Loki["Loki"]
+  SMTP["SMTP optional"]
+
+  User -->|"HTTPS"| SPA
+  SPA -->|"HTTPS REST + JWT"| API
+  API -->|"Prisma / SQL"| DB
   API --> Files
-  API -->|metrics_logs| Prom
+  API -.-> SMTP
+  Prom -.->|"/metrics"| API
   Prom --> Grafana
-  API --> Loki
+  API -.-> Loki
 ```
 
 ## 2. Logical layers (API)
@@ -58,9 +65,9 @@ Controllers (HTTP) → Application Services → Domain Services → Repositories
 
 | App | Tech | Responsibility |
 |-----|------|----------------|
-| `apps/web` | Vite React | UI |
+| `apps/RecuirementDashboard` | Vite React | UI SPA |
 | `apps/api` | NestJS | Business APIs |
-| `docker/*` | Compose | Local runtime |
+| `docker/*` | Compose | Local / packaged runtime |
 
 ## 4. Cross-cutting
 
@@ -89,5 +96,8 @@ Keep modules independently foldered (`requirements`, `candidates`, …) with no 
 ## References
 
 - ADR-0002  
+- [ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md](./ENTERPRISE_HIGH_LEVEL_DIAGRAMS.md) — **clean enterprise diagram pack**  
+- [BEGINNER_HIGH_LEVEL_ARCHITECTURE.md](./BEGINNER_HIGH_LEVEL_ARCHITECTURE.md) — plain-language beginner HLA  
+- [BEGINNER_ARCHITECTURE_DIAGRAMS.md](./BEGINNER_ARCHITECTURE_DIAGRAMS.md) — talk-track Mermaid pack  
 - [C4_MODEL.md](./C4_MODEL.md)  
 - [../13-monorepo/MONOREPO_STRUCTURE.md](../13-monorepo/MONOREPO_STRUCTURE.md)  

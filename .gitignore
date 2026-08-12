@@ -39,3 +39,8 @@ apps/api/generated/
 
 # Vite
 apps/web/dist/
+
+# Large Docker image archives (exceed GitHub 100MB file limit)
+*.tar
+sst-v1-images.tar
+sst-v1-handoff/sst-v1-images.tar
