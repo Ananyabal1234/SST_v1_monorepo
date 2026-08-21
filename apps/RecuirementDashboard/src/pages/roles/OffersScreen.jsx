@@ -1,8 +1,13 @@
 import { useEffect, useState } from 'react';
 import { get, patch } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
-import { IconCheckCircle, IconFilePlus, IconEdit } from '../../components/Icons';
+import { IconCheckCircle, IconFilePlus, IconEdit, IconFilter, IconX } from '../../components/Icons';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { formatDate, toDateInput } from '../../utils/formatDate';
+import { matchesQuery, useDebouncedValue } from '../../utils/listSearch';
+import TableSearch from '../../components/TableSearch';
+import { EmptyState, ScreenSkeleton } from '../../components/ui';
+import { useToast } from '../../context/ToastContext';
 
 const HR_OFFER_STATUS_CODES = ['RELEASED', 'ACCEPTED', 'DECLINED', 'HOLD', 'BACKOUT'];
 const FALLBACK_OFFER_STATUSES = [
@@ -13,11 +18,6 @@ const FALLBACK_OFFER_STATUSES = [
   { code: 'HOLD', label: 'Hold' },
   { code: 'BACKOUT', label: 'Backout' },
 ];
-
-function toDateInput(value) {
-  if (!value) return '';
-  return String(value).slice(0, 10);
-}
 
 function normalizeOffers(res) {
   if (Array.isArray(res)) return res;
@@ -55,15 +55,16 @@ function offerRow(o, statusOptions) {
     status,
     statusLabel: statusLabel(status, statusOptions),
     ctcRate: o.ctcRate || '—',
-    selectedDate: toDateInput(o.selectedDate) || '—',
-    offerInitiatedDate: toDateInput(o.offerInitiatedDate) || '—',
-    offerReleasedDate: toDateInput(o.offerReleasedDate) || '—',
-    expectedDoj: toDateInput(o.expectedDoj) || '—',
+    selectedDate: formatDate(o.selectedDate),
+    offerInitiatedDate: formatDate(o.offerInitiatedDate),
+    offerReleasedDate: formatDate(o.offerReleasedDate),
+    expectedDoj: formatDate(o.expectedDoj),
     remarks: o.remarks || '—',
   };
 }
 
 export default function OffersScreen() {
+  const { toast } = useToast();
   const [offers, setOffers] = useState([]);
   const [statusOptions, setStatusOptions] = useState(FALLBACK_OFFER_STATUSES);
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,9 @@ export default function OffersScreen() {
   const [loadingOffer, setLoadingOffer] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [listSearch, setListSearch] = useState('');
+  const listSearchQ = useDebouncedValue(listSearch);
+  const [statusFilter, setStatusFilter] = useState('');
 
   useEscapeKey(modalOpen, () => { if (!saving) setModalOpen(false); });
 
@@ -183,11 +187,12 @@ export default function OffersScreen() {
       };
       const res = await patch(`${ENDPOINTS.OFFERS}/${editingId}`, payload);
       const nextStatus = String(form.statusCode || '').toUpperCase();
-      setSuccess(
+      const okMsg =
         nextStatus === 'ACCEPTED'
           ? (res?.message || 'Offer accepted — candidate moved to Onboarding')
-          : (res?.message || 'Offer updated successfully'),
-      );
+          : (res?.message || 'Offer updated successfully');
+      setSuccess(okMsg);
+      toast(okMsg);
       setModalOpen(false);
       await loadOffers();
     } catch (err) {
@@ -201,25 +206,112 @@ export default function OffersScreen() {
     }
   };
 
-  if (loading) return <div className="screen-loading"><div className="spinner" /></div>;
+  if (loading) return <ScreenSkeleton rows={8} />;
 
   const visibleOffers = offers.filter(
     (o) => String(o.offerStatus || o.statusCode || '').toUpperCase() !== 'ACCEPTED',
   );
+  const statusChoices = [...new Set(
+    visibleOffers.map((o) => String(o.offerStatus || o.statusCode || '').toUpperCase()).filter(Boolean),
+  )];
+  const statusFiltered = statusFilter
+    ? visibleOffers.filter((o) => String(o.offerStatus || o.statusCode || '').toUpperCase() === statusFilter)
+    : visibleOffers;
+  const displayedOffers = statusFiltered.filter((o) => {
+    const row = offerRow(o, selectOptions);
+    return matchesQuery(
+      listSearchQ,
+      row.publicId,
+      row.candidatePublicId,
+      row.candidateName,
+      row.email,
+      row.mobile,
+      row.position,
+      row.client,
+    );
+  });
+  const hasFilters = Boolean(statusFilter || listSearch.trim());
+  const clearFilters = () => {
+    setStatusFilter('');
+    setListSearch('');
+  };
 
   return (
-    <div className="hr-candidates">
+    <div className="hr-candidates hr-offers">
       <div className="assign-head">
         <span className="assign-badge"><IconCheckCircle /></span>
         <div>
           <h2 className="assign-title">Offers</h2>
           <p className="assign-sub">View and update candidate offers (Accepted offers move to Onboarding).</p>
         </div>
+        {visibleOffers.length > 0 && <span className="yr-count">{displayedOffers.length} shown</span>}
       </div>
 
       {error && !modalOpen && <div className="add-error">{error}</div>}
       {success && <div className="add-success">{success}</div>}
 
+      {visibleOffers.length > 0 && (
+        <div className="filter-bar">
+          <div className="filter-bar-head">
+            <IconFilter />
+            <span>Filters</span>
+            {hasFilters && (
+              <span className="filter-count">
+                {(statusFilter ? 1 : 0) + (listSearch.trim() ? 1 : 0)} active
+              </span>
+            )}
+            {hasFilters && (
+              <button type="button" className="filter-clear" onClick={clearFilters}>Clear</button>
+            )}
+          </div>
+          {hasFilters && (
+            <div className="filter-chips" aria-label="Active filters">
+              {statusFilter && (
+                <button type="button" className="filter-chip" onClick={() => setStatusFilter('')}>
+                  Status: {statusLabel(statusFilter, selectOptions)}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+              {listSearch.trim() && (
+                <button type="button" className="filter-chip" onClick={() => setListSearch('')}>
+                  Search: {listSearch.trim()}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+            </div>
+          )}
+          <div className="filter-fields">
+            <div className="filter-field">
+              <span className="filter-label">Status</span>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                <option value="">All</option>
+                {statusChoices.map((code) => (
+                  <option key={code} value={code}>{statusLabel(code, selectOptions)}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <TableSearch
+            value={listSearch}
+            onChange={setListSearch}
+            placeholder="Search offers, candidates, IDs…"
+          />
+        </div>
+      )}
+
+      {visibleOffers.length === 0 ? (
+        <EmptyState
+          icon={IconCheckCircle}
+          title="No offers found"
+          description="Accepted offers move to Onboarding. New offers will appear here."
+        />
+      ) : displayedOffers.length === 0 ? (
+        <EmptyState
+          icon={IconCheckCircle}
+          title="No matching offers"
+          description="Try a different search."
+        />
+      ) : (
       <div className="cand-table-wrap">
         <table className="cand-table hr-table">
           <thead>
@@ -241,10 +333,7 @@ export default function OffersScreen() {
             </tr>
           </thead>
           <tbody>
-            {visibleOffers.length === 0 && (
-              <tr><td colSpan={14} className="cand-empty">No offers found.</td></tr>
-            )}
-            {visibleOffers.map((o) => {
+            {displayedOffers.map((o) => {
               const row = offerRow(o, selectOptions);
               return (
                 <tr key={row.id || row.publicId}>
@@ -255,16 +344,20 @@ export default function OffersScreen() {
                   <td>{row.client}</td>
                   <td>{row.email}</td>
                   <td>{row.mobile}</td>
-                  <td>{row.statusLabel}</td>
+                  <td>
+                    <span className={`hr-pill hr-pill-status ${(row.status || '').toLowerCase()}`}>
+                      {row.statusLabel}
+                    </span>
+                  </td>
                   <td>{row.ctcRate}</td>
                   <td>{row.selectedDate}</td>
                   <td>{row.offerInitiatedDate}</td>
                   <td>{row.offerReleasedDate}</td>
                   <td>{row.expectedDoj}</td>
                   <td>
-                    <button className="hr-detail-btn" onClick={() => openUpdate(o)}>
+                    <button className="hr-detail-btn" onClick={() => openUpdate(o)} title="Update details">
                       <IconEdit />
-                      <span>Update Details</span>
+                      <span>Update</span>
                     </button>
                   </td>
                 </tr>
@@ -273,6 +366,7 @@ export default function OffersScreen() {
           </tbody>
         </table>
       </div>
+      )}
 
       {modalOpen && (
         <div className="modal-overlay" onClick={() => !saving && setModalOpen(false)}>

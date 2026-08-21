@@ -46,9 +46,10 @@
 .modal-card.modal-large { width: 960px; max-width: 96vw; }
 .modal-card.modal-xl { width: min(1200px, 96vw); max-width: 96vw; }
 
-.pipeline-modal .modal-card {
-  max-width: min(1200px, 96vw);
-  width: 96vw;
+.modal-card.pipeline-modal {
+  width: min(1200px, 96vw);
+  max-width: 96vw;
+  max-height: 92vh;
 }
 
 .modal-head {

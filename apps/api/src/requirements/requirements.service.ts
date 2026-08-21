@@ -21,12 +21,16 @@ import {
   type PipelineStageCode,
 } from '../common/pipeline-stage';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notifications/notifications.service';
 import {
   requirementCreatedEmail,
   salesRequirementClosedEmail,
   taAssignmentEmail,
   taLeadAssignmentEmail,
 } from '../mail/templates';
+import {
+  resumeMetaFromCandidate,
+} from '../candidates/candidate-resume.util';
 
 const userSelect = {
   id: true,
@@ -63,6 +67,7 @@ export class RequirementsService {
     private readonly audit: AuditService,
     private readonly ids: IdSequenceService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private isPublicId(id: string) {
@@ -139,6 +144,64 @@ export class RequirementsService {
         : null,
       taOwnerId: primary?.id ?? null,
     };
+  }
+
+  private async attachPulse<T extends { id: string; updatedAt: Date }>(
+    items: T[],
+  ) {
+    if (!items.length) return items;
+    const ids = items.map((i) => i.id);
+    const candidates = await this.prisma.candidate.findMany({
+      where: { requirementId: { in: ids }, deletedAt: null },
+      select: {
+        requirementId: true,
+        updatedAt: true,
+        selected: true,
+        stageCode: true,
+        feedbackCode: true,
+        interviewRound: true,
+        offer: { select: { statusCode: true } },
+        onboarding: { select: { statusCode: true } },
+      },
+    });
+    const rank: Record<string, number> = {
+      JOINED: 90,
+      ONBOARDING: 80,
+      OFFER: 70,
+      SELECTED: 60,
+      INTERVIEW: 50,
+      CLIENT_SHORTLIST: 40,
+      SUBMITTED_TO_SPOC: 30,
+      HOLD: 20,
+      REJECT: 10,
+    };
+    const byReq = new Map<string, typeof candidates>();
+    for (const c of candidates) {
+      const list = byReq.get(c.requirementId) ?? [];
+      list.push(c);
+      byReq.set(c.requirementId, list);
+    }
+    return items.map((item) => {
+      const list = byReq.get(item.id) ?? [];
+      let furthest: string | null = null;
+      let furthestRank = -1;
+      let last = item.updatedAt;
+      for (const c of list) {
+        const { pipelineStage } = derivePipelineStage(c);
+        const r = rank[pipelineStage] ?? 0;
+        if (r > furthestRank) {
+          furthestRank = r;
+          furthest = pipelineStage;
+        }
+        if (c.updatedAt > last) last = c.updatedAt;
+      }
+      return {
+        ...item,
+        candidateCount: list.length,
+        furthestPipelineStage: furthest,
+        lastActivityAt: last,
+      };
+    });
   }
 
   private mapTaOwners(req: {
@@ -307,6 +370,17 @@ export class RequirementsService {
         scenario: 'ta-assignment',
       });
     }
+    void this.notifications.createMany(
+      taUserIds.map((userId) => ({
+        userId,
+        type: 'TA_ASSIGNED',
+        title: `Assigned ${row.publicId}`,
+        body: `${row.client?.name || '—'} · ${row.roleSkill}`,
+        entityType: 'Requirement',
+        entityId: row.id,
+        linkTab: 'assign',
+      })),
+    );
   }
 
   private async notifyAssignedTaLeads(
@@ -339,6 +413,17 @@ export class RequirementsService {
         scenario: 'ta-lead-assignment',
       });
     }
+    void this.notifications.createMany(
+      leadUserIds.map((userId) => ({
+        userId,
+        type: 'TA_LEAD_ASSIGNED',
+        title: `TA Lead on ${row.publicId}`,
+        body: `${row.client?.name || '—'} · ${row.roleSkill}`,
+        entityType: 'Requirement',
+        entityId: row.id,
+        linkTab: 'lead-assign',
+      })),
+    );
   }
 
   private async notifyRequirementCreated(
@@ -777,8 +862,8 @@ export class RequirementsService {
     ]);
 
     const counts = await this.closedCounts(rows.map((r) => r.id));
-    const items = rows.map((r) =>
-      this.withDerived(r, counts.get(r.id) ?? 0),
+    const items = await this.attachPulse(
+      rows.map((r) => this.withDerived(r, counts.get(r.id) ?? 0)),
     );
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   }
@@ -809,6 +894,7 @@ export class RequirementsService {
 
     const candidates = await this.prisma.candidate.findMany({
       where: { requirementId: row.id, deletedAt: null },
+      omit: { resumeData: true },
       include: {
         offer: { select: { id: true, publicId: true, statusCode: true } },
         onboarding: {
@@ -834,6 +920,7 @@ export class RequirementsService {
       });
       return {
         ...c,
+        ...resumeMetaFromCandidate(c),
         pipelineStage: pipeline.pipelineStage,
         pipelineLabel: pipeline.pipelineLabel,
         candidateStatus: c.selected
@@ -1337,5 +1424,64 @@ export class RequirementsService {
     }
 
     return updated;
+  }
+
+  async listNotes(id: string, _actor?: AuthUser): Promise<any> {
+    const row = await this.findRequirementOrThrow(id);
+    return this.prisma.requirementNote.findMany({
+      where: { requirementId: row.id },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        author: {
+          select: { id: true, fullName: true, email: true, role: true },
+        },
+      },
+    });
+  }
+
+  async addNote(id: string, body: string, actor: AuthUser): Promise<any> {
+    const row = await this.findRequirementOrThrow(id);
+    const trimmed = (body || '').trim();
+    if (!trimmed) {
+      throw new BadRequestException('Note body is required');
+    }
+    const note = await this.prisma.requirementNote.create({
+      data: {
+        requirementId: row.id,
+        authorUserId: actor.id,
+        body: trimmed,
+      },
+      include: {
+        author: {
+          select: { id: true, fullName: true, email: true, role: true },
+        },
+      },
+    });
+    const payloads: Array<{ userId: string; linkTab: string }> = [];
+    if (row.salesOwnerId && row.salesOwnerId !== actor.id) {
+      payloads.push({ userId: row.salesOwnerId, linkTab: 'your' });
+    }
+    for (const a of row.taAssignments ?? []) {
+      if (a.userId && a.userId !== actor.id) {
+        payloads.push({ userId: a.userId, linkTab: 'assign' });
+      }
+    }
+    for (const a of row.taLeadAssignments ?? []) {
+      if (a.userId && a.userId !== actor.id) {
+        payloads.push({ userId: a.userId, linkTab: 'lead-assign' });
+      }
+    }
+    void this.notifications.createMany(
+      payloads.map((p) => ({
+        userId: p.userId,
+        type: 'NOTE_ADDED',
+        title: `Note on ${row.publicId}`,
+        body: `${actor.fullName}: ${trimmed.slice(0, 140)}`,
+        entityType: 'Requirement',
+        entityId: row.id,
+        linkTab: p.linkTab,
+      })),
+    );
+    return note;
   }
 }

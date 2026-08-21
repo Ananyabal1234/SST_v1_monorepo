@@ -1,17 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { get, patch } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconUser } from '../../components/Icons';
 import TaOwnersMultiSelect, { formatTaOwnerNames, formatTaLeadNames } from '../../components/TaOwnersMultiSelect';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { matchesQuery, useDebouncedValue } from '../../utils/listSearch';
+import TableSearch from '../../components/TableSearch';
+import { EmptyState, ScreenSkeleton } from '../../components/ui';
+import { useToast } from '../../context/ToastContext';
 
 /** TA Lead workspace: view all requirements, assign TA owners, view pipelines. */
 export default function TaLeadAssignScreen() {
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ clientId: '', priorityCode: '', status: '', assignment: '' });
+  const [listSearch, setListSearch] = useState('');
+  const listSearchQ = useDebouncedValue(listSearch);
   const [assigning, setAssigning] = useState(null);
   const [taOwnerIds, setTaOwnerIds] = useState([]);
   const [taOwnerOptions, setTaOwnerOptions] = useState([]);
@@ -101,9 +110,17 @@ export default function TaLeadAssignScreen() {
           (Array.isArray(r.taLeads) && r.taLeads.length);
         if (!(unassigned && hasLead)) return false;
       }
-      return true;
+      return matchesQuery(
+        listSearchQ,
+        r.publicId,
+        r.client?.name,
+        r.roleSkill,
+        r.salesOwner?.fullName,
+        formatTaOwnerNames(r),
+        formatTaLeadNames(r),
+      );
     });
-  }, [items, filters]);
+  }, [items, filters, listSearchQ]);
 
   const hasFilters = Boolean(
     filters.clientId || filters.priorityCode || filters.status || filters.assignment,
@@ -139,6 +156,15 @@ export default function TaLeadAssignScreen() {
     setViewingCandidate(null);
   });
 
+  useEffect(() => {
+    const req = searchParams.get('req');
+    if (!req || !items.length) return;
+    const match = items.find((r) => r.id === req || r.publicId === req);
+    if (match) openAssign(match);
+    // openAssign is stable enough for a deep-link once items load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, items]);
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!assigning) return;
@@ -154,6 +180,7 @@ export default function TaLeadAssignScreen() {
         taOwnerIds,
       });
       setAssignSuccess('TA owners assigned successfully');
+      toast('TA owners assigned successfully');
       closeAssign();
       load();
     } catch (err) {
@@ -237,20 +264,30 @@ export default function TaLeadAssignScreen() {
         </div>
       )}
 
+      {!loading && !error && items.length > 0 && (
+        <TableSearch
+          value={listSearch}
+          onChange={setListSearch}
+          placeholder="Search req ID, client, role…"
+        />
+      )}
+
       {loading ? (
-        <div className="screen-loading"><div className="spinner" /></div>
+        <ScreenSkeleton rows={8} />
       ) : error ? (
         <div className="add-error">{error}</div>
       ) : items.length === 0 ? (
-        <div className="yr-empty">
-          <IconList />
-          <p>No requirements found yet.</p>
-        </div>
+        <EmptyState
+          icon={IconList}
+          title="No requirements found yet"
+          description="New requirements will appear here for TA assignment."
+        />
       ) : visible.length === 0 ? (
-        <div className="yr-empty">
-          <IconList />
-          <p>No requirements match the selected filters.</p>
-        </div>
+        <EmptyState
+          icon={IconList}
+          title="No matching requirements"
+          description="Try a different search or clear filters."
+        />
       ) : (
         <div className="table-wrap">
           <table className="data-table yr-table">

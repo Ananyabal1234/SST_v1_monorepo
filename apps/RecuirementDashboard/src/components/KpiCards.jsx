@@ -3,7 +3,13 @@ import {
   IconClipboardCheck, IconChart,
 } from './Icons';
 
-// Map each KPI label to an icon + a target used to draw the radial progress ring.
+const RISK_KPI = new Set([
+  'overdueRequirements',
+  'wastedSourcing',
+  'cancelledRequirements',
+  'requirementsAtRisk',
+]);
+
 const KPI_META = {
   totalRequirements: { Icon: IconBriefcase, target: 100 },
   totalPositions: { Icon: IconFolderOpen, target: 200 },
@@ -61,52 +67,64 @@ function getKpiLabel(kpi) {
   return KPI_LABELS[kpi.label] || kpi.label || 'KPI';
 }
 
-function cssVar(name, fallback) {
-  if (typeof window === 'undefined') return fallback;
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
+export default function KpiCards({ kpis = [], onCardClick, heroLabels }) {
+  const renderCard = (k, featured = false) => {
+    const label = k.label || k.name || k.key || `kpi-${Math.random().toString(36).slice(2, 8)}`;
+    const Icon = KPI_META[label]?.Icon || IconBriefcase;
+    const tone = RISK_KPI.has(label) ? ' kpi-card-risk' : '';
+    const size = featured ? ' kpi-card-hero' : ' kpi-card-compact';
 
-export default function KpiCards({ kpis = [], onCardClick }) {
-  const successLight = cssVar('--color-success-light', '#22c55e');
-  const success = cssVar('--color-success', '#16a34a');
+    return (
+      <div
+        className={`kpi-card${tone}${size}`}
+        key={label}
+        role={onCardClick ? 'button' : undefined}
+        tabIndex={onCardClick ? 0 : undefined}
+        onClick={() => onCardClick && onCardClick(label)}
+        onKeyDown={(e) => {
+          if (!onCardClick) return;
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onCardClick(label);
+          }
+        }}
+      >
+        <span className="kpi-icon"><Icon /></span>
+        <div className="kpi-copy">
+          <span className="kpi-value">{formatKpiValue(label, k.value)}</span>
+          <span className="kpi-label">{getKpiLabel(k)}</span>
+        </div>
+      </div>
+    );
+  };
+
+  if (Array.isArray(heroLabels) && heroLabels.length) {
+    const heroSet = new Set(heroLabels);
+    const hero = kpis.filter((k) => heroSet.has(k.label));
+    const rest = kpis.filter((k) => !heroSet.has(k.label));
+    return (
+      <div className="kpi-stack">
+        <div className="kpi-section">
+          <h2 className="kpi-section-title">Key metrics</h2>
+          <div className="kpi-grid kpi-grid-hero">
+            {hero.map((k) => renderCard(k, true))}
+          </div>
+        </div>
+        {rest.length > 0 && (
+          <details className="kpi-more" open>
+            <summary>More metrics</summary>
+            <div className="kpi-grid kpi-grid-compact">
+              {rest.map((k) => renderCard(k, false))}
+            </div>
+          </details>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="kpi-grid">
-      {/* Shared gradient for the radial progress rings — uses semantic success tokens */}
-      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-        <defs>
-          <linearGradient id="kpiGrad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={successLight} />
-            <stop offset="100%" stopColor={success} />
-          </linearGradient>
-        </defs>
-      </svg>
-      {kpis.map((k) => {
-        const label = k.label || k.name || k.key || `kpi-${Math.random().toString(36).slice(2, 8)}`;
-        const Icon = KPI_META[label]?.Icon || IconBriefcase;
-        return (
-          <div
-            className="kpi-card"
-            key={label}
-            role={onCardClick ? 'button' : undefined}
-            tabIndex={onCardClick ? 0 : undefined}
-            onClick={() => onCardClick && onCardClick(label)}
-            onKeyDown={(e) => {
-              if (!onCardClick) return;
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onCardClick(label);
-              }
-            }}
-          >
-            <div className="kpi-top">
-              <span className="kpi-icon"><Icon /></span>
-            </div>
-            <span className="kpi-value">{formatKpiValue(label, k.value)}</span>
-            <span className="kpi-label">{getKpiLabel(k)}</span>
-          </div>
-        );
-      })}
+      {kpis.map((k) => renderCard(k, false))}
     </div>
   );
 }

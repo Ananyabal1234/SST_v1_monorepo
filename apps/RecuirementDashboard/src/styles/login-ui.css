@@ -1,0 +1,447 @@
+/* =============================================================
+   Login visual redesign (additive)
+   -------------------------------------------------------------
+   HOW TO REVERT:
+   - Remove this file import from global.css
+   - Remove decorative JSX in Login.jsx (.login-bg, .login-chips, spinner)
+   Auth markup and Phase 8 split layout remain.
+   ============================================================= */
+
+.login-page {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+}
+
+/* ----- Quiet background ----- */
+.login-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.login-bg-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--text) 18%, transparent) 1px, transparent 1.5px);
+  background-size: 28px 28px;
+  opacity: 0.12;
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(64px);
+  opacity: 0.45;
+}
+
+.login-orb-a {
+  width: 380px;
+  height: 380px;
+  top: -140px;
+  left: -100px;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  animation: login-orb-drift-a 28s ease-in-out infinite;
+}
+
+.login-orb-b {
+  width: 320px;
+  height: 320px;
+  right: -120px;
+  bottom: -100px;
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  animation: login-orb-drift-b 34s ease-in-out infinite;
+}
+
+[data-theme='light'] .login-bg-grid { opacity: 0.08; }
+[data-theme='light'] .login-orb { opacity: 0.35; }
+
+@keyframes login-orb-drift-a {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(24px, 16px); }
+}
+
+@keyframes login-orb-drift-b {
+  0%, 100% { transform: translate(0, 0); }
+  50% { transform: translate(-20px, -12px); }
+}
+
+/* Theme toggle sits on the page, not on the form */
+.login-page > .login-theme-toggle {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
+  border-radius: 9999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-xs);
+}
+
+.login-page > .login-theme-toggle:hover {
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  background: var(--hover);
+}
+
+.login-page > .login-theme-toggle svg {
+  transition: transform 180ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.login-page > .login-theme-toggle:hover svg {
+  transform: rotate(-16deg);
+}
+
+/* ----- Solid split card ----- */
+.login-page .login-split {
+  position: relative;
+  z-index: 1;
+  width: min(960px, 94vw);
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: login-card-in 360ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@keyframes login-card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.login-page .login-aside {
+  display: none;
+  padding: 36px 32px;
+  gap: 0;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 8%, var(--bg-soft)) 0%, var(--bg-soft) 42%);
+  border-right: 1px solid var(--border);
+  color: var(--text);
+}
+
+.login-kicker {
+  margin: 16px 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.login-page .login-aside h2 {
+  margin: 0 0 10px;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.login-aside-lead {
+  margin: 0 0 20px;
+  max-width: 38ch;
+  color: var(--text-soft);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.login-persona-stack {
+  display: flex;
+  align-items: center;
+  margin: 0 0 22px;
+}
+
+.login-persona-stack .login-avatar {
+  margin-left: -8px;
+  box-shadow: 0 0 0 2px var(--bg-soft);
+}
+
+.login-persona-stack .login-avatar:first-child {
+  margin-left: 0;
+}
+
+.login-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  color: #fff;
+  text-align: center;
+}
+
+.av-sales { background: #0284c7; }
+.av-ta { background: #0f766e; }
+.av-hr { background: #7c3aed; }
+.av-onb { background: #c2410c; }
+
+.login-personas {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.login-personas::before {
+  content: '';
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  transform: translateX(-50%);
+  background: var(--border);
+}
+
+.login-personas li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.login-personas li .login-avatar {
+  box-shadow: 0 0 0 3px var(--bg-soft);
+  margin: 0;
+  padding: 0;
+}
+
+.login-personas li > div strong {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.login-personas li > div span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.login-personas li:hover strong {
+  color: var(--primary);
+}
+
+.login-page .login-split .login-card {
+  padding: 40px 36px 32px;
+  background: var(--surface);
+}
+
+.login-page .login-brand {
+  margin-bottom: 28px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.login-page .login-brand h1 {
+  margin: 16px 0 6px;
+  font-size: 1.5rem;
+  letter-spacing: -0.03em;
+}
+
+.login-page .login-subtitle {
+  font-size: 0.875rem;
+}
+
+.login-page .login-form {
+  gap: 16px;
+}
+
+.login-page .login-form label span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text);
+}
+
+.login-page .login-form input {
+  height: 44px;
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--bg);
+  transition:
+    border-color 150ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1)),
+    box-shadow 150ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
+}
+
+.login-page .login-form input:hover {
+  border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+}
+
+.login-page .login-form input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+
+/* Password: reserve space so the eye never covers typed text */
+.login-page .password-field {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.login-page .password-field input,
+.login-page .login-form .password-field input {
+  padding-right: 48px;
+}
+
+.login-page .login-form .password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-soft);
+  box-shadow: none;
+  opacity: 1;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-page .login-form .password-toggle:hover {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  opacity: 1;
+  transform: translateY(-50%);
+}
+
+.login-page .login-form .password-toggle:active {
+  transform: translateY(-50%);
+}
+
+.login-page .login-form > label,
+.login-page .login-form > button[type='submit'] {
+  animation: login-field-in 360ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+.login-page .login-form > label:nth-of-type(1) { animation-delay: 60ms; }
+.login-page .login-form > label:nth-of-type(2) { animation-delay: 100ms; }
+.login-page .login-form > button[type='submit'] { animation-delay: 140ms; }
+
+@keyframes login-field-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 840px) {
+  .login-page .login-split {
+    grid-template-columns: 1.05fr 1fr;
+  }
+
+  .login-page .login-aside {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .login-page .login-brand .logo {
+    display: none;
+  }
+
+  .login-page .login-brand h1 {
+    margin-top: 0;
+  }
+}
+
+.login-page .login-form > button.btn-primary {
+  height: 44px;
+  margin-top: 4px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.login-page .login-form > button.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--primary) 24%, transparent);
+  opacity: 1;
+}
+
+.login-page .login-form > button.btn-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.login-btn-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--text-on-primary) 35%, transparent);
+  border-top-color: var(--text-on-primary);
+  animation: login-spin 0.7s linear infinite;
+}
+
+@keyframes login-spin {
+  to { transform: rotate(360deg); }
+}
+
+.login-page .login-form > .login-error {
+  animation: login-error-shake 420ms var(--ease-out, cubic-bezier(0.2, 0, 0, 1));
+}
+
+@keyframes login-error-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-2px); }
+}
+
+.login-page .login-hint {
+  text-align: left;
+  margin-top: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-orb,
+  .login-page .login-split,
+  .login-page .login-form > label,
+  .login-page .login-form > .login-error,
+  .login-page .login-form > button,
+  .login-page .login-error {
+    animation: none !important;
+  }
+
+  .login-page .login-form > button.btn-primary:hover:not(:disabled),
+  .login-page .login-form > button.btn-primary:active:not(:disabled),
+  .login-page > .login-theme-toggle:hover svg {
+    transform: none !important;
+  }
+
+  .login-page .login-form .password-toggle:hover,
+  .login-page .login-form .password-toggle:active {
+    transform: translateY(-50%) !important;
+  }
+
+  .login-btn-spinner {
+    animation: none;
+  }
+}

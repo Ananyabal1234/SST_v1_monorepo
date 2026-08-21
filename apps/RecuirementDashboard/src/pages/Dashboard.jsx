@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth, USER_TYPE_LABELS } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { get, post } from '../services/apiClient';
@@ -11,8 +12,13 @@ import FilterBar from '../components/FilterBar';
 import { DASHBOARD_COLUMNS } from '../config/columns';
 import {
   IconDashboard, IconSun, IconMoon, IconLogout, IconPlus, IconClipboardCheck, IconUsers, IconList, IconCheckCircle, IconUser,
+  IconChevronsLeft, IconChevronsRight, IconInbox,
 } from '../components/Icons';
-import { useEscapeKey } from '../hooks/useEscapeKey';
+import NotificationBell from '../components/NotificationBell';
+import { Modal, ScreenSkeleton } from '../components/ui';
+import TableSearch from '../components/TableSearch';
+import { matchesQuery } from '../utils/listSearch';
+import { formatDate, isIsoDateString } from '../utils/formatDate';
 import SalesScreen from './roles/SalesScreen';
 import TaOwnerScreen from './roles/TaOwnerScreen';
 import HrScreen from './roles/HrScreen';
@@ -25,6 +31,7 @@ import UsersScreen from './roles/UsersScreen';
 import YourRequirementsScreen from './roles/YourRequirementsScreen';
 import MyTasksScreen from './roles/MyTasksScreen';
 import TaLeadAssignScreen from './roles/TaLeadAssignScreen';
+import MyWorkScreen from './roles/MyWorkScreen';
 
 // Map each user type to the screen component it can visit.
 // (Admin has no dedicated tab — "Add request" replaces it.)
@@ -39,35 +46,47 @@ const ROLE_SCREENS = {
 };
 
 // Which secondary tab(s) each user type sees, alongside the Dashboard.
+const WORK_TAB = { key: 'work', label: 'My Work', icon: IconInbox };
+
 const SECONDARY_TABS = {
   sales: [
+    WORK_TAB,
     { key: 'add', label: 'Add Request', icon: IconPlus },
     { key: 'your', label: 'Requirements', icon: IconList },
     { key: 'mytasks', label: 'Task History', icon: IconUsers },
   ],
   sales_lead: [
+    WORK_TAB,
     { key: 'add', label: 'Add Request', icon: IconPlus },
     { key: 'your', label: 'Requirements', icon: IconList },
     { key: 'mytasks', label: 'Task History', icon: IconUsers },
   ],
-  ta_owner: [{ key: 'assign', label: 'Assign Task', icon: IconClipboardCheck }],
+  ta_owner: [
+    WORK_TAB,
+    { key: 'assign', label: 'Assign Task', icon: IconClipboardCheck },
+  ],
   ta_lead: [
+    WORK_TAB,
     { key: 'lead-assign', label: 'Requirements & Pipeline', icon: IconList },
     { key: 'assign', label: 'Assign Task', icon: IconClipboardCheck },
   ],
   hr: [
+    WORK_TAB,
     { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
     { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
   ],
   hr_lead: [
+    WORK_TAB,
     { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
     { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
   ],
   onboarding: [
+    WORK_TAB,
     { key: 'hr-offers', label: 'Offer', icon: IconCheckCircle },
     { key: 'hr-onboarding', label: 'Onboarding', icon: IconUsers },
   ],
   admin: [
+    WORK_TAB,
     { key: 'add', label: 'Add Request', icon: IconPlus },
     { key: 'your', label: 'Requirements', icon: IconList },
     { key: 'assign', label: 'Assign Task', icon: IconClipboardCheck },
@@ -195,13 +214,24 @@ function attachKpiPercentages(kpis) {
   });
 }
 
+const HERO_KPI_LABELS = ['openPositions', 'candidatesInPipeline', 'offersAccepted', 'overdueRequirements'];
+const SIDEBAR_COLLAPSE_KEY = 'sst-sidebar-collapsed';
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const userType = user?.userType || 'admin';
+  const [searchParams, setSearchParams] = useSearchParams();
   const [rows, setRows] = useState([]);
   const [kpis, setKpis] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | role key
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
   const [filters, setFilters] = useState({
     taOwner: 'All',
     salesOwner: 'All',
@@ -325,7 +355,35 @@ export default function Dashboard() {
     return () => { active = false; };
   }, []);
 
-  const userType = user?.userType || 'admin';
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [sidebarCollapsed]);
+
+  const allowedTabs = new Set([
+    'overview',
+    ...(SECONDARY_TABS[userType] || []).map((t) => t.key),
+  ]);
+  const requestedTab = searchParams.get('tab') || 'overview';
+  const activeTab = allowedTabs.has(requestedTab) ? requestedTab : 'overview';
+
+  const setActiveTab = (key, extra = {}) => {
+    if (key === 'overview') {
+      setSearchParams({}, { replace: true });
+    } else {
+      setSearchParams({ tab: key, ...extra });
+    }
+  };
+
+  useEffect(() => {
+    if (requestedTab !== 'overview' && !allowedTabs.has(requestedTab)) {
+      setSearchParams({}, { replace: true });
+    }
+  }, [requestedTab, userType, setSearchParams]);
+
   const roleScreen = ROLE_SCREENS[userType];
 
   // Apply dropdown + date filters (each defaults to "All"/empty => no filtering).
@@ -372,9 +430,9 @@ export default function Dashboard() {
   const displayedKpisFiltered = displayedKpis.filter((k) => KPI_DISPLAY_LABELS.includes(k.label));
 
   return (
-    <div className="dashboard">
+    <div className="dashboard" data-ui-levels="L1 L2 L3 L4 L5 L6">
       {/* Sidebar — narrow, icon-led navigation */}
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarCollapsed ? ' is-collapsed' : ''}`}>
         <div className="sidebar-brand">
           <Logo size={40} />
         </div>
@@ -414,6 +472,16 @@ export default function Dashboard() {
               <span>{USER_TYPE_LABELS[userType]}</span>
             </div>
           </div>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <IconChevronsRight /> : <IconChevronsLeft />}
+            <span>{sidebarCollapsed ? 'Expand' : 'Collapse'}</span>
+          </button>
           <button className="logout-btn" onClick={logout}>
             <IconLogout />
             <span>Log out</span>
@@ -425,10 +493,11 @@ export default function Dashboard() {
       <main className="main">
         <header className="topbar">
           <div className="topbar-title">
-            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'lead-assign' ? 'Assign Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'users' ? 'Users' : `${roleScreen?.label} Workspace`}</h1>
+            <h1>{activeTab === 'overview' ? 'Recruitment Overview' : activeTab === 'work' ? 'My Work' : activeTab === 'add' ? 'Add Request' : activeTab === 'your' ? 'Requirements' : activeTab === 'lead-assign' ? 'Assign Requirements' : activeTab === 'assign' ? 'Assign Task' : activeTab === 'hr-offers' ? 'Offer' : activeTab === 'hr-onboarding' ? 'Onboarding' : activeTab === 'users' ? 'Users' : `${roleScreen?.label} Workspace`}</h1>
             <span className="role-pill">{USER_TYPE_LABELS[userType]}</span>
           </div>
           <div className="topbar-meta">
+            <NotificationBell />
             <span className="email">{user?.email}</span>
             <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
               {theme === 'dark' ? <IconSun /> : <IconMoon />}
@@ -439,7 +508,7 @@ export default function Dashboard() {
 
         {activeTab === 'overview' ? (
           loading ? (
-            <div className="screen-loading"><div className="spinner" /></div>
+            <ScreenSkeleton cards={8} rows={4} />
           ) : (
             <>
               <FilterBar
@@ -456,6 +525,7 @@ export default function Dashboard() {
               />
               <KpiCards
                 kpis={displayedKpisFiltered}
+                heroLabels={HERO_KPI_LABELS}
                 onCardClick={(label) => {
                   const listName = KPI_LIST_MAP[label];
                   const listRows = listName && Array.isArray(dashboardLists[listName])
@@ -474,6 +544,8 @@ export default function Dashboard() {
               {/* <DataTable rows={filteredRows} variant="full" /> */}
             </>
           )
+        ) : activeTab === 'work' ? (
+          <MyWorkScreen />
         ) : activeTab === 'add' ? (
           // Add request form
           <AddRequestScreen />
@@ -508,7 +580,7 @@ export default function Dashboard() {
 
 // Modal listing the rows that make up a clicked KPI.
 function KpiModal({ kpi, onClose }) {
-  useEscapeKey(true, onClose);
+  const [search, setSearch] = useState('');
   const key = kpi.label;
   const listKey = kpi.listKey;
   const items = Array.isArray(kpi.rows) ? kpi.rows : [];
@@ -517,7 +589,6 @@ function KpiModal({ kpi, onClose }) {
     const bValue = Number(b[key]) || 0;
     return bValue - aValue;
   });
-  const totalValue = sortedItems.reduce((sum, row) => sum + (Number(row[key]) || 0), 0);
   const formatHeader = (header) => header
     .replace(/([A-Z])/g, ' $1')
     .replace(/_/g, ' ')
@@ -540,8 +611,8 @@ function KpiModal({ kpi, onClose }) {
 
   const columns = listKey
     ? Array.from(new Set(sortedItems.flatMap((row) => Object.keys(row))))
-      .filter((key) => !HIDDEN_KEYS.has(key))
-      .map((key) => ({ key, label: formatHeader(key) }))
+      .filter((colKey) => !HIDDEN_KEYS.has(colKey))
+      .map((colKey) => ({ key: colKey, label: formatHeader(colKey) }))
     : DASHBOARD_COLUMNS.filter((c) => [
       'taOwner', 'salesOwner', 'priority', 'client', 'jobFamily',
       'totalRequirements', 'totalPositions', 'openPositions', 'closedPositions',
@@ -560,32 +631,47 @@ function KpiModal({ kpi, onClose }) {
         .join(', ') || '—';
     }
     if (typeof value === 'object') {
+      if (value instanceof Date) return formatDate(value);
       if ('publicId' in value && value.publicId) return value.publicId;
       if ('name' in value) return value.name;
       if ('fullName' in value) return value.fullName;
       return JSON.stringify(value);
     }
     if (typeof value === 'string' && UUID_LIKE.test(value)) return '—';
+    if (isIsoDateString(value)) return formatDate(value);
     return value;
   };
 
+  const visibleItems = sortedItems.filter((row) =>
+    matchesQuery(search, ...columns.map((col) => formatCell(row[col.key]))),
+  );
+
   return (
-    <div className="modal-overlay" onClick={onClose} role="presentation">
-      <div
-        className="modal-card modal-large"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="kpi-modal-title"
-      >
-        <div className="modal-head">
-          <h3 id="kpi-modal-title">{getKpiLabel({ label: key })} Details — {totalValue} total</h3>
-          <button type="button" className="modal-close" onClick={onClose} title="Close" aria-label="Close dialog">×</button>
-        </div>
-        <div className="modal-body">
-          {sortedItems.length === 0 && <p className="modal-empty">No records for this metric.</p>}
-          {sortedItems.length > 0 && (
-            <div className="table-wrap">
+    <Modal
+      open
+      onClose={onClose}
+      size="large"
+      cardClassName="kpi-detail-modal"
+      title={(
+        <>
+          {getKpiLabel({ label: key })}
+          <span className="kpi-modal-count">{sortedItems.length} records</span>
+        </>
+      )}
+    >
+      {sortedItems.length === 0 ? (
+        <div className="kpi-modal-empty">No records for this metric.</div>
+      ) : (
+        <>
+          <TableSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search this list…"
+          />
+          {visibleItems.length === 0 ? (
+            <div className="kpi-modal-empty">No rows match that search.</div>
+          ) : (
+            <div className="table-wrap kpi-modal-table-wrap">
               <table className="data-table modal-table">
                 <thead>
                   <tr>
@@ -595,7 +681,7 @@ function KpiModal({ kpi, onClose }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedItems.map((row) => (
+                  {visibleItems.map((row) => (
                     <tr key={row.id || JSON.stringify(row).slice(0, 100)}>
                       {columns.map((col) => (
                         <td key={col.key}>{formatCell(row[col.key])}</td>
@@ -606,8 +692,8 @@ function KpiModal({ kpi, onClose }) {
               </table>
             </div>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </Modal>
   );
 }

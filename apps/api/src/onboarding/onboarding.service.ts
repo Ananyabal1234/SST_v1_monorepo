@@ -17,6 +17,7 @@ import {
   UpdateOnboardingDto,
 } from './dto/onboarding.dto';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notifications/notifications.service';
 import {
   candidateJoinedEmail,
 } from '../mail/templates';
@@ -31,6 +32,7 @@ export class OnboardingService {
     @Inject(forwardRef(() => OffersService))
     private readonly offers: OffersService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private isPublicId(id: string) {
@@ -784,16 +786,16 @@ export class OnboardingService {
 
     const req = await this.prisma.requirement.findFirst({
       where: { id: onboarding.requirementId, deletedAt: null },
-      include: {
-        client: { select: { name: true } },
-        salesOwner: { select: { fullName: true, email: true } },
-        taAssignments: {
-          include: {
-            user: { select: { fullName: true, email: true } },
+        include: {
+          client: { select: { name: true } },
+          salesOwner: { select: { id: true, fullName: true, email: true } },
+          taAssignments: {
+            include: {
+              user: { select: { id: true, fullName: true, email: true } },
+            },
           },
+          taOwner: { select: { id: true, fullName: true, email: true } },
         },
-        taOwner: { select: { fullName: true, email: true } },
-      },
     });
     if (!req) return;
 
@@ -858,5 +860,22 @@ export class OnboardingService {
         scenario: 'candidate-joined',
       });
     }
+
+    const notifyUsers: Array<{ id?: string }> = [];
+    if (req.salesOwner?.id) notifyUsers.push(req.salesOwner);
+    for (const ta of taRecipients) {
+      if (ta && 'id' in ta && ta.id) notifyUsers.push(ta);
+    }
+    void this.notifications.createMany(
+      notifyUsers.map((u) => ({
+        userId: u.id as string,
+        type: 'CANDIDATE_JOINED',
+        title: `${candidateName} joined`,
+        body: `${publicId} · ${req.client?.name || '—'} · ${roleSkill}`,
+        entityType: 'Requirement',
+        entityId: req.id,
+        linkTab: 'your',
+      })),
+    );
   }
 }

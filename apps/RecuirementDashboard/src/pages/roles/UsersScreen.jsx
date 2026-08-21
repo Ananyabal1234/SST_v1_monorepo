@@ -2,8 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { get, post, patch, del } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconUser, IconFilePlus, IconFilter, IconEdit, IconEye, IconEyeOff } from '../../components/Icons';
+import { IconUser, IconFilePlus, IconFilter, IconEdit, IconEye, IconEyeOff, IconX } from '../../components/Icons';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { formatDate } from '../../utils/formatDate';
+import { useToast } from '../../context/ToastContext';
+import TableSearch from '../../components/TableSearch';
+import { EmptyState } from '../../components/ui';
 
 const EMPTY_FORM = {
   email: '',
@@ -39,15 +43,6 @@ function roleLabel(roles, value) {
   return roles.find((r) => r.value === value)?.label || value;
 }
 
-function formatDate(value) {
-  if (!value) return '—';
-  try {
-    return new Date(value).toLocaleDateString();
-  } catch {
-    return '—';
-  }
-}
-
 function errorMessage(err, fallback) {
   const msg = err?.response?.data?.message;
   return Array.isArray(msg) ? msg.join(', ') : msg || fallback;
@@ -55,6 +50,7 @@ function errorMessage(err, fallback) {
 
 export default function UsersScreen() {
   const { user: currentUser } = useAuth();
+  const { toast } = useToast();
   const [form, setForm] = useState(EMPTY_FORM);
   const [roles, setRoles] = useState(FALLBACK_ROLES);
   const [saving, setSaving] = useState(false);
@@ -138,6 +134,7 @@ export default function UsersScreen() {
   const editSelectedRole = roles.find((r) => r.value === editing?.role);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const isSelf = (id) => currentUser?.id && id === currentUser.id;
+  const hasFilters = Boolean(roleFilter || statusFilter || searchInput.trim());
 
   const clearFilters = () => {
     setRoleFilter('');
@@ -210,6 +207,11 @@ export default function UsersScreen() {
           ? `User updated and password reset: ${editing.fullName}`
           : `User updated: ${editing.fullName}`,
       );
+      toast(
+        editing.newPassword
+          ? `User updated and password reset: ${editing.fullName}`
+          : `User updated: ${editing.fullName}`,
+      );
       closeEdit();
       await loadUsers();
     } catch (err) {
@@ -236,6 +238,7 @@ export default function UsersScreen() {
     try {
       await del(`${ENDPOINTS.USERS}/${u.id}`);
       setSuccess(`User deleted: ${u.fullName}`);
+      toast(`User deleted: ${u.fullName}`);
       if (editing?.id === u.id) closeEdit();
       await loadUsers();
     } catch (err) {
@@ -276,6 +279,7 @@ export default function UsersScreen() {
       };
       const res = await post(ENDPOINTS.USERS, payload);
       setSuccess(res?.message || `User created: ${payload.fullName} (${payload.role})`);
+      toast(res?.message || `User created: ${payload.fullName} (${payload.role})`);
       setForm({ ...EMPTY_FORM, role: form.role });
       setPage(1);
       await loadUsers();
@@ -287,7 +291,7 @@ export default function UsersScreen() {
   };
 
   return (
-    <div className="hr-candidates">
+    <div className="users-screen">
       <div className="assign-head">
         <span className="assign-badge"><IconUser /></span>
         <div>
@@ -296,14 +300,46 @@ export default function UsersScreen() {
             View, create, edit, and delete login credentials by role.
           </p>
         </div>
+        <span className="yr-count">{total} users</span>
       </div>
 
       <div className="filter-bar">
         <div className="filter-bar-head">
           <IconFilter />
           <span>Filters</span>
-          <span className="filter-count">{total} users</span>
+          {hasFilters && (
+            <span className="filter-count">
+              {(roleFilter ? 1 : 0) + (statusFilter ? 1 : 0) + (searchInput.trim() ? 1 : 0)} active
+            </span>
+          )}
+          {hasFilters && (
+            <button type="button" className="filter-clear" onClick={clearFilters}>
+              Clear
+            </button>
+          )}
         </div>
+        {hasFilters && (
+          <div className="filter-chips" aria-label="Active filters">
+            {roleFilter && (
+              <button type="button" className="filter-chip" onClick={() => { setRoleFilter(''); setPage(1); }}>
+                Role: {roleLabel(roles, roleFilter)}
+                <IconX width={12} height={12} />
+              </button>
+            )}
+            {statusFilter && (
+              <button type="button" className="filter-chip" onClick={() => { setStatusFilter(''); setPage(1); }}>
+                Status: {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                <IconX width={12} height={12} />
+              </button>
+            )}
+            {searchInput.trim() && (
+              <button type="button" className="filter-chip" onClick={() => { setSearchInput(''); setSearchQ(''); setPage(1); }}>
+                Search: {searchInput.trim()}
+                <IconX width={12} height={12} />
+              </button>
+            )}
+          </div>
+        )}
         <div className="filter-fields">
           <label className="filter-field">
             <span className="filter-label">Role</span>
@@ -335,29 +371,27 @@ export default function UsersScreen() {
               <option value="inactive">Inactive</option>
             </select>
           </label>
-
-          <label className="filter-field">
-            <span className="filter-label">Search</span>
-            <input
-              type="text"
-              placeholder="Name or email"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-            />
-          </label>
-
-          <button type="button" className="filter-clear" onClick={clearFilters}>
-            Clear
-          </button>
         </div>
+        <TableSearch
+          value={searchInput}
+          onChange={setSearchInput}
+          placeholder="Search name or email…"
+        />
       </div>
 
       {listError && <div className="add-error">{listError}</div>}
       {error && <div className="add-error">{error}</div>}
       {success && <div className="add-success">{success}</div>}
 
-      <div className="table-wrap mb-lg">
-        <table className="data-table">
+      {!listLoading && users.length === 0 ? (
+        <EmptyState
+          icon={IconUser}
+          title="No users found"
+          description={hasFilters ? 'Try a different search or clear filters.' : 'Create a user below to add the first login.'}
+        />
+      ) : (
+      <div className="table-wrap users-table-card">
+        <table className="data-table users-table">
           <thead>
             <tr>
               <th>Full name</th>
@@ -369,21 +403,26 @@ export default function UsersScreen() {
             </tr>
           </thead>
           <tbody>
-            {listLoading ? (
+            {listLoading && users.length === 0 ? (
               <tr>
                 <td colSpan={6}>Loading users…</td>
-              </tr>
-            ) : users.length === 0 ? (
-              <tr>
-                <td colSpan={6}>No users match the current filters.</td>
               </tr>
             ) : (
               users.map((u) => (
                 <tr key={u.id}>
-                  <td>{u.fullName}{isSelf(u.id) ? ' (you)' : ''}</td>
+                  <td>
+                    {u.fullName}
+                    {isSelf(u.id) ? <span className="users-you">you</span> : null}
+                  </td>
                   <td>{u.email}</td>
-                  <td>{roleLabel(roles, u.role)}</td>
-                  <td>{u.isActive ? 'Active' : 'Inactive'}</td>
+                  <td>
+                    <span className="users-pill users-pill-role">{roleLabel(roles, u.role)}</span>
+                  </td>
+                  <td>
+                    <span className={`users-pill users-pill-status ${u.isActive ? 'active' : 'inactive'}`}>
+                      {u.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
                   <td>{formatDate(u.createdAt)}</td>
                   <td>
                     <div className="users-row-actions">
@@ -412,6 +451,7 @@ export default function UsersScreen() {
           </tbody>
         </table>
       </div>
+      )}
 
       {total > 0 && (
         <div className="users-pager">
@@ -437,86 +477,83 @@ export default function UsersScreen() {
         </div>
       )}
 
-      <div className="page-header mt-md">
-        <div>
-          <h2 className="page-header-title">Create User</h2>
-          <p className="page-header-sub">
-            Admin only — create login credentials for Sales, Sales Lead, TA, TA Lead, HR, HR Lead, or Admin.
-          </p>
+      <section className="users-create">
+        <div className="users-create-head">
+          <h3>Create User</h3>
+          <p>Admin only — create login credentials for Sales, Sales Lead, TA, TA Lead, HR, HR Lead, or Admin.</p>
         </div>
-      </div>
-
-      <form className="add-form" onSubmit={saveUser}>
-        <div className="detail-grid single-col">
-          <label className="detail-field">
-            <span className="detail-label">Email *</span>
-            <input
-              type="email"
-              placeholder="user@example.com"
-              value={form.email}
-              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="detail-field">
-            <span className="detail-label">Full Name *</span>
-            <input
-              type="text"
-              placeholder="Full name"
-              value={form.fullName}
-              onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
-              required
-            />
-          </label>
-
-          <label className="detail-field">
-            <span className="detail-label">Role *</span>
-            <select
-              value={form.role}
-              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
-              required
-            >
-              {roles.map((r) => (
-                <option key={r.value} value={r.value}>{r.label}</option>
-              ))}
-            </select>
-            {selectedRole?.description && (
-              <span className="detail-label field-hint">{selectedRole.description}</span>
-            )}
-          </label>
-
-          <label className="detail-field">
-            <span className="detail-label">Password *</span>
-            <div className="password-field">
+        <form onSubmit={saveUser}>
+          <div className="users-create-grid">
+            <label className="detail-field">
+              <span className="detail-label">Email *</span>
               <input
-                type={showCreatePassword ? 'text' : 'password'}
-                placeholder="Minimum 8 characters"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                type="email"
+                placeholder="user@example.com"
+                value={form.email}
+                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 required
-                minLength={8}
               />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowCreatePassword((v) => !v)}
-                title={showCreatePassword ? 'Hide password' : 'Show password'}
-                aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
-              >
-                {showCreatePassword ? <IconEyeOff /> : <IconEye />}
-              </button>
-            </div>
-          </label>
-        </div>
+            </label>
 
-        <div className="form-actions">
-          <button type="submit" className="hr-detail-save" disabled={saving}>
-            <IconFilePlus />
-            <span>{saving ? 'Creating…' : 'Create User'}</span>
-          </button>
-        </div>
-      </form>
+            <label className="detail-field">
+              <span className="detail-label">Full Name *</span>
+              <input
+                type="text"
+                placeholder="Full name"
+                value={form.fullName}
+                onChange={(e) => setForm((p) => ({ ...p, fullName: e.target.value }))}
+                required
+              />
+            </label>
+
+            <label className="detail-field">
+              <span className="detail-label">Role *</span>
+              <select
+                value={form.role}
+                onChange={(e) => setForm((p) => ({ ...p, role: e.target.value }))}
+                required
+              >
+                {roles.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+              {selectedRole?.description && (
+                <span className="detail-label field-hint">{selectedRole.description}</span>
+              )}
+            </label>
+
+            <label className="detail-field">
+              <span className="detail-label">Password *</span>
+              <div className="password-field">
+                <input
+                  type={showCreatePassword ? 'text' : 'password'}
+                  placeholder="Minimum 8 characters"
+                  value={form.password}
+                  onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
+                  required
+                  minLength={8}
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowCreatePassword((v) => !v)}
+                  title={showCreatePassword ? 'Hide password' : 'Show password'}
+                  aria-label={showCreatePassword ? 'Hide password' : 'Show password'}
+                >
+                  {showCreatePassword ? <IconEyeOff /> : <IconEye />}
+                </button>
+              </div>
+            </label>
+          </div>
+
+          <div className="users-create-actions">
+            <button type="submit" className="hr-detail-save" disabled={saving}>
+              <IconFilePlus />
+              <span>{saving ? 'Creating…' : 'Create User'}</span>
+            </button>
+          </div>
+        </form>
+      </section>
 
       {editing && (
         <div

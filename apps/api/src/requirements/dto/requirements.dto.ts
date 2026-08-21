@@ -258,3 +258,10 @@ export const TA_LEAD_UPDATE_FIELDS = [
   'taHandoffDate',
   'remarks',
 ] as const;
+
+export class CreateRequirementNoteDto {
+  @ApiProperty({ example: 'Client asked to pause L2 until Monday.' })
+  @IsString()
+  @MinLength(1)
+  body!: string;
+}

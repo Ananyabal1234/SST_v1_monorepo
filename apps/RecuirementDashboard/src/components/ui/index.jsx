@@ -120,3 +120,19 @@ export function SkeletonBlock({ rows = 3, className = '' }) {
     </div>
   );
 }
+
+export function ScreenSkeleton({ cards = 0, rows = 6 }) {
+  return (
+    <div className="screen-skeleton" aria-busy="true" aria-label="Loading">
+      <Skeleton variant="short" className="mb-lg" style={{ height: 28, width: 220 }} />
+      {cards > 0 ? (
+        <div className="kpi-grid">
+          {Array.from({ length: cards }).map((_, i) => (
+            <Skeleton key={i} variant="card" />
+          ))}
+        </div>
+      ) : null}
+      <SkeletonBlock rows={rows} />
+    </div>
+  );
+}

@@ -12,3 +12,12 @@
 @import './components/modal.css';
 @import './components/badge.css';
 @import './components/pipeline.css';
+
+/* Dashboard UI/UX levels L1?L4 ? remove this import (or a LEVEL block inside) to revert */
+@import './dashboard-ui-levels.css';
+
+/* Role-screen UI/UX phases — remove this import (or a PHASE block inside) to revert */
+@import './role-ui-levels.css';
+
+/* Login visual redesign — remove this import to revert */
+@import './login-ui.css';

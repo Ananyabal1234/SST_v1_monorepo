@@ -24,6 +24,8 @@ model User {
   taRequirements    Requirement[]  @relation("TaOwner")
   taAssignments     RequirementTaAssignment[]
   taLeadAssignments RequirementTaLeadAssignment[]
+  notifications     Notification[]
+  requirementNotes  RequirementNote[] @relation("NoteAuthor")
 
   @@map("users")
 }
@@ -122,6 +124,7 @@ model Requirement {
   taOwner           User?             @relation("TaOwner", fields: [taOwnerId], references: [id])
   taAssignments     RequirementTaAssignment[]
   taLeadAssignments RequirementTaLeadAssignment[]
+  notes             RequirementNote[]
 
   @@index([status])
   @@index([taOwnerId])
@@ -180,6 +183,10 @@ model Candidate {
   /// LOI gate: offer only when NOT_APPLICABLE or RECEIVED (default NOT_RECEIVED on select).
   loiStatus            LoiStatus   @default(NOT_RECEIVED) @map("loi_status")
   remarks              String?
+  resumeFileName       String?     @map("resume_file_name")
+  resumeMimeType       String?     @map("resume_mime_type")
+  resumeSizeBytes      Int?        @map("resume_size_bytes")
+  resumeData           Bytes?      @map("resume_data")
   createdAt            DateTime    @default(now()) @map("created_at")
   updatedAt            DateTime    @updatedAt @map("updated_at")
   deletedAt            DateTime?   @map("deleted_at")
@@ -245,6 +252,37 @@ model Onboarding {
   @@index([requirementId])
   @@index([statusCode])
   @@map("onboardings")
+}
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  type       String
+  title      String
+  body       String?
+  entityType String?   @map("entity_type")
+  entityId   String?   @map("entity_id")
+  linkTab    String?   @map("link_tab")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model RequirementNote {
+  id            String      @id @default(uuid())
+  requirementId String      @map("requirement_id")
+  authorUserId  String      @map("author_user_id")
+  body          String
+  createdAt     DateTime    @default(now()) @map("created_at")
+  requirement   Requirement @relation(fields: [requirementId], references: [id], onDelete: Cascade)
+  author        User        @relation("NoteAuthor", fields: [authorUserId], references: [id])
+
+  @@index([requirementId, createdAt])
+  @@map("requirement_notes")
 }
 
 model AuditLog {

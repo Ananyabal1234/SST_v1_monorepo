@@ -44,6 +44,7 @@
 .detail-field textarea,
 .cand-field input,
 .cand-field select,
+.cand-field textarea,
 .login-form input,
 .filter-field select,
 .filter-field input[type='date'],
@@ -67,7 +68,8 @@
 .detail-field select,
 .detail-field textarea,
 .cand-field input,
-.cand-field select {
+.cand-field select,
+.cand-field textarea {
   font-size: var(--text-ui);
   background: var(--surface);
 }
@@ -81,6 +83,7 @@
 .detail-field textarea:focus,
 .cand-field input:focus,
 .cand-field select:focus,
+.cand-field textarea:focus,
 .login-form input:focus,
 .filter-field select:focus,
 .filter-field input[type='date']:focus,
@@ -96,6 +99,7 @@
 .add-field select:disabled,
 .cand-field input:disabled,
 .cand-field select:disabled,
+.cand-field textarea:disabled,
 .detail-field input[readonly],
 .hr-status-select:disabled {
   opacity: 0.65;
@@ -107,9 +111,16 @@
 }
 
 .cand-field input,
-.cand-field select {
+.cand-field select,
+.cand-field textarea {
   width: 100%;
   box-sizing: border-box;
+}
+
+.cand-field textarea {
+  min-height: 84px;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .cand-field select {
@@ -244,6 +255,58 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
+}
+
+.cand-field.full {
+  grid-column: 1 / -1;
+}
+
+.cand-field .optional {
+  color: var(--text-soft);
+  font-style: normal;
+  font-weight: var(--font-weight-regular);
+  margin-left: 6px;
+}
+
+.cand-field-badge {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-success-dark, #15803d);
+  background: var(--rag-green-bg, #dcfce7);
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+}
+
+.cand-field--autofill input,
+.cand-field--autofill textarea {
+  border-color: color-mix(in srgb, var(--color-success, #16a34a) 45%, var(--border));
+  background: color-mix(in srgb, var(--rag-green-bg, #dcfce7) 55%, var(--surface));
+}
+
+.resume-file-meta,
+.resume-download-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-ui);
+  color: var(--text);
+}
+
+.resume-file-meta span,
+.resume-download-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resume-parse-warnings {
+  font-size: var(--text-caption);
+  color: var(--text-soft);
 }
 
 /* Password field */

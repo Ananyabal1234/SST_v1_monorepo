@@ -223,3 +223,58 @@ export class DuplicateLookupQueryDto {
   @IsString()
   excludeId?: string;
 }
+
+export class TalentPoolQueryDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  requirementId!: string;
+
+  @ApiPropertyOptional({ description: 'Extra keywords on top of the requirement role' })
+  @IsOptional()
+  @IsString()
+  q?: string;
+}
+
+export class ImportCandidateRowDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  name!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(1)
+  mobile!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  source?: string;
+
+  @ApiPropertyOptional({ description: 'Notes or profile URL' })
+  @IsOptional()
+  @IsString()
+  remarks?: string;
+}
+
+export class ImportCandidatesDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  requirementId!: string;
+
+  @ApiPropertyOptional({
+    description: 'CSV with header name,email,mobile and optional source,remarks',
+  })
+  @IsOptional()
+  @IsString()
+  csv?: string;
+
+  @ApiPropertyOptional({ type: [ImportCandidateRowDto] })
+  @IsOptional()
+  rows?: ImportCandidateRowDto[];
+}

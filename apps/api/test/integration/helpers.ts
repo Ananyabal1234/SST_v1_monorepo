@@ -53,7 +53,38 @@ export async function api(
   } catch {
     data = text;
   }
-  return { status: res.status, data };
+  return { status: res.status, data, headers: res.headers };
+}
+
+export async function apiMultipart(
+  method: string,
+  urlPath: string,
+  opts: {
+    token?: string;
+    fieldName?: string;
+    fileName: string;
+    mimeType: string;
+    content: Buffer | Uint8Array | string;
+  },
+) {
+  const form = new FormData();
+  const blob = new Blob([opts.content], { type: opts.mimeType });
+  form.append(opts.fieldName || 'resume', blob, opts.fileName);
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (opts.token) headers.Authorization = `Bearer ${opts.token}`;
+  const res = await fetch(`${PREFIX}${urlPath}`, {
+    method,
+    headers,
+    body: form,
+  });
+  const text = await res.text();
+  let data: any = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  return { status: res.status, data, headers: res.headers, raw: text };
 }
 
 export function unwrap<T = any>(payload: any): T {

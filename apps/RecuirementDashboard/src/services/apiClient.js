@@ -178,6 +178,8 @@ const LIVE_ENDPOINTS = [
   '/api/v1/users',
   '/api/v1/offers',
   '/api/v1/onboardings',
+  '/api/v1/notifications',
+  '/api/v1/work',
 ];
 
 function isLiveEndpoint(endpoint) {
@@ -229,4 +231,85 @@ export async function del(endpoint) {
   if (!isLiveEndpoint(endpoint)) return emptySafeResponse(endpoint);
   const { data } = await client.delete(endpoint);
   return data;
+}
+
+export function getResumeDownloadUrl(candidateId) {
+  return `${ENDPOINTS.CANDIDATE_RESUME}/${candidateId}/resume`;
+}
+
+export async function uploadResume(candidateId, file) {
+  const endpoint = `${ENDPOINTS.CANDIDATE_RESUME}/${candidateId}/resume`;
+  if (!isLiveEndpoint(endpoint)) return emptySafeResponse(endpoint);
+  const formData = new FormData();
+  formData.append('resume', file);
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const message = data?.message || data?.error || 'Failed to upload resume';
+    throw new Error(Array.isArray(message) ? message.join(', ') : message);
+  }
+  return data;
+}
+
+export async function parseResume(file) {
+  const endpoint = ENDPOINTS.PARSE_RESUME;
+  if (!isLiveEndpoint(endpoint)) return emptySafeResponse(endpoint);
+  const formData = new FormData();
+  formData.append('resume', file);
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  });
+  const text = await res.text();
+  let data = null;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const message = data?.message || data?.error || 'Failed to parse resume';
+    throw new Error(Array.isArray(message) ? message.join(', ') : message);
+  }
+  return data;
+}
+
+export async function downloadResume(candidateId, fileName = 'resume') {
+  const endpoint = getResumeDownloadUrl(candidateId);
+  const token = localStorage.getItem('auth_token');
+  const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let message = 'Failed to download resume';
+    try {
+      message = JSON.parse(text)?.message || message;
+    } catch {
+      if (text) message = text;
+    }
+    throw new Error(message);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

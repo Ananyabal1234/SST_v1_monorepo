@@ -1,9 +1,12 @@
 import { useTheme } from '../context/ThemeContext';
 import {
-  IconChart, IconPie, IconBar,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell,
+} from 'recharts';
+import {
+  IconChart, IconPie, IconBar, IconTrending,
 } from './Icons';
 
-// Semantic chart colors (danger is NOT brand primary — brand stays sky #0ea5e9)
 const FALLBACK = {
   success: '#16a34a',
   successBright: '#4ade80',
@@ -12,7 +15,6 @@ const FALLBACK = {
   primary: '#0ea5e9',
 };
 
-// Read theme colors from CSS variables so charts match dark/light mode.
 function cssVar(name, fallback = '#888') {
   if (typeof window === 'undefined') return fallback;
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -25,13 +27,14 @@ function semanticColors() {
     warning: cssVar('--color-warning-bright', FALLBACK.warning),
     danger: cssVar('--color-danger', FALLBACK.danger),
     primary: cssVar('--primary', FALLBACK.primary),
-    ragGreen: cssVar('--rag-green-fg', FALLBACK.success),
-    ragAmber: cssVar('--rag-amber-fg', FALLBACK.warning),
-    ragRed: cssVar('--rag-red-fg', FALLBACK.danger),
+    text: cssVar('--dash-text-strong', cssVar('--text', '#f0f7fb')),
+    muted: cssVar('--dash-text-quiet', cssVar('--text-soft', '#8aa6b8')),
+    grid: cssVar('--grid', '#243640'),
+    tooltipBg: cssVar('--tooltip-bg', cssVar('--surface', '#16212a')),
+    border: cssVar('--dash-card-border', cssVar('--border', '#243640')),
   };
 }
 
-// ---- Aggregate helpers (computed from the dashboard rows) ----
 function byClient(rows, field) {
   const map = {};
   rows.forEach((r) => { map[r.client] = (map[r.client] || 0) + (r[field] || 0); });
@@ -83,13 +86,116 @@ function positionStatus(rows, colors) {
   ];
 }
 
-export default function DashboardCharts({ rows, kpis = [], openPositionsOnClient = null, closedPositionsOnClient = null, requirementRagSummary = null }) {
+function stageConversion(funnel) {
+  const pct = (next, prev) => (prev > 0 ? Math.round((next / prev) * 100) : 0);
+  return [
+    { name: 'Selected / Pipeline', value: pct(funnel[1]?.value, funnel[0]?.value) },
+    { name: 'Offers / Selected', value: pct(funnel[2]?.value, funnel[1]?.value) },
+    { name: 'Accepted / Offers', value: pct(funnel[3]?.value, funnel[2]?.value) },
+    { name: 'Joined / Accepted', value: pct(funnel[4]?.value, funnel[3]?.value) },
+  ];
+}
+
+function ChartTooltip({ active, payload, label, suffix = '' }) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  const title = label || item.name || item.payload?.name || item.payload?.client;
+  return (
+    <div className="chart-tooltip">
+      <strong>{title}</strong>
+      <span>{item.value}{suffix}</span>
+    </div>
+  );
+}
+
+function reduceMotion() {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function ClientBarChart({ data, color, empty }) {
+  if (!data.length) {
+    return <div className="progress-empty">{empty}</div>;
+  }
+  const colors = semanticColors();
+  return (
+    <div className="chart-plot">
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
+          <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" horizontal={false} />
+          <XAxis type="number" tick={{ fill: colors.muted, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+          <YAxis
+            type="category"
+            dataKey="client"
+            width={92}
+            tick={{ fill: colors.muted, fontSize: 11 }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(14, 165, 233, 0.08)' }} />
+          <Bar dataKey="value" fill={color} radius={[0, 6, 6, 0]} maxBarSize={18} isAnimationActive={!reduceMotion()} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function DonutChart({ data, centerLabel, total }) {
+  const hasData = data.some((d) => d.value > 0);
+  if (!hasData) {
+    return <div className="progress-empty">No data found.</div>;
+  }
+  return (
+    <div className="chart-donut">
+      <div className="chart-donut-wrap">
+        <ResponsiveContainer width="100%" height={180}>
+          <PieChart>
+            <Pie
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              innerRadius={52}
+              outerRadius={74}
+              paddingAngle={2}
+              stroke="none"
+              isAnimationActive={!reduceMotion()}
+            >
+              {data.map((d) => (
+                <Cell key={d.name} fill={d.color} />
+              ))}
+            </Pie>
+            <Tooltip content={<ChartTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="chart-donut-center">
+          <strong>{total}</strong>
+          <span>{centerLabel}</span>
+        </div>
+      </div>
+      <ul className="rag-legend">
+        {data.map((d) => (
+          <li key={d.name}>
+            <span className="rag-dot" style={{ background: d.color }} />
+            {d.name}
+            <strong>{d.value}</strong>
+            <em>{total ? Math.round((d.value / total) * 100) : 0}%</em>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export default function DashboardCharts({
+  rows,
+  kpis = [],
+  openPositionsOnClient = null,
+  closedPositionsOnClient = null,
+  requirementRagSummary = null,
+}) {
   const { theme } = useTheme();
-  // `theme` is referenced so the component re-renders on toggle.
   void theme;
   const colors = semanticColors();
 
-  // When API returns summary-only response (no rows), use kpis from summary
   const ragFromSummary = normalizeRagSummary(requirementRagSummary, colors);
   const effectiveRows = rows.length ? rows : kpis.map((k) => ({
     client: k.label,
@@ -116,152 +222,76 @@ export default function DashboardCharts({ rows, kpis = [], openPositionsOnClient
   const rag = ragFromSummary || ragBreakdown(effectiveRows, colors);
   const funnel = pipelineFunnel(effectiveRows);
   const status = positionStatus(effectiveRows, colors);
+  const conversion = stageConversion(funnel);
 
-  const maxClient = Math.max(1, ...openByClient.map((d) => d.value));
-  const maxClosed = Math.max(1, ...closedByClient.map((d) => d.value));
-  const maxFunnel = Math.max(1, ...funnel.map((d) => d.value));
-  const ragTotal = rag.reduce((s, d) => s + d.value, 0) || 1;
-  const statusTotal = status.reduce((s, d) => s + d.value, 0) || 1;
+  const ragTotal = rag.reduce((s, d) => s + d.value, 0);
+  const statusTotal = status.reduce((s, d) => s + d.value, 0);
+  const funnelHasData = funnel.some((d) => d.value > 0);
 
   return (
     <div className="charts-grid">
-      {/* Pipeline funnel — horizontal progress bars */}
       <div className="chart-card span-2">
         <h3><IconChart /> Recruitment Funnel</h3>
-        <div className="progress-list">
-          {funnel.map((d) => {
-            const pct = Math.round((d.value / maxFunnel) * 100);
-            return (
-              <div className="progress-row" key={d.stage}>
-                <span className="progress-name">{d.stage}</span>
-                <div className="progress-track">
-                  <div className="progress-fill funnel" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="progress-val">{d.value}</span>
+        {funnelHasData ? (
+          <div className="funnel-stack">
+            {funnel.map((d, i) => (
+              <div
+                className="funnel-stage"
+                key={d.stage}
+                style={{ width: `${100 - i * 10}%` }}
+              >
+                <span className="funnel-stage-name">{d.stage}</span>
+                <strong className="funnel-stage-val">{d.value}</strong>
               </div>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="progress-empty">No data found.</div>
+        )}
       </div>
 
-      {/* Open positions by client — progress list */}
+      {funnelHasData && (
+        <div className="chart-card span-2">
+          <h3><IconTrending /> Stage conversion</h3>
+          <div className="chart-plot">
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={conversion} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
+                <CartesianGrid stroke={colors.grid} strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: colors.muted, fontSize: 11 }} axisLine={false} tickLine={false} interval={0} />
+                <YAxis
+                  domain={[0, 100]}
+                  tick={{ fill: colors.muted, fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(v) => `${v}%`}
+                  width={40}
+                />
+                <Tooltip content={<ChartTooltip suffix="%" />} cursor={{ fill: 'rgba(14, 165, 233, 0.08)' }} />
+                <Bar dataKey="value" fill={colors.primary} radius={[6, 6, 0, 0]} maxBarSize={42} isAnimationActive={!reduceMotion()} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
       <div className="chart-card">
         <h3><IconBar /> Open Positions on Client</h3>
-        <div className="progress-list">
-          {openByClient.length > 0 ? openByClient.map((d) => {
-            const pct = Math.round((d.value / maxClient) * 100);
-            return (
-              <div className="progress-row" key={d.client}>
-                <span className="progress-name">{d.client}</span>
-                <div className="progress-track">
-                  <div className="progress-fill client" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="progress-val">{d.value}</span>
-              </div>
-            );
-          }) : (
-            <div className="progress-empty">No data found.</div>
-          )}
-        </div>
+        <ClientBarChart data={openByClient} color={colors.success} empty="No data found." />
       </div>
 
-      {/* Closed positions by client — progress list */}
       <div className="chart-card">
         <h3><IconBar /> Closed Positions on Client</h3>
-        <div className="progress-list">
-          {closedByClient.length > 0 ? closedByClient.map((d) => {
-            const pct = Math.round((d.value / maxClosed) * 100);
-            return (
-              <div className="progress-row" key={d.client}>
-                <span className="progress-name">{d.client}</span>
-                <div className="progress-track">
-                  <div className="progress-fill closed" style={{ width: `${pct}%` }} />
-                </div>
-                <span className="progress-val">{d.value}</span>
-              </div>
-            );
-          }) : (
-            <div className="progress-empty">No data found.</div>
-          )}
-        </div>
+        <ClientBarChart data={closedByClient} color={colors.danger} empty="No data found." />
       </div>
 
-      {/* RAG summary — radial gauge + legend */}
       <div className="chart-card">
         <h3><IconPie /> Requirement RAG</h3>
-        <div className="rag-gauge">
-          <svg viewBox="0 0 120 120" className="rag-svg">
-            <circle cx="60" cy="60" r="50" className="rag-bg" />
-            {(() => {
-              let acc = 0;
-              return rag.map((d) => {
-                const frac = d.value / ragTotal;
-                const dash = frac * (2 * Math.PI * 50);
-                const el = (
-                  <circle
-                    key={d.name}
-                    cx="60" cy="60" r="50"
-                    className="rag-seg"
-                    style={{ stroke: d.color, strokeDasharray: `${dash} ${2 * Math.PI * 50}`, strokeDashoffset: -acc }}
-                    transform="rotate(-90 60 60)"
-                  />
-                );
-                acc += dash;
-                return el;
-              });
-            })()}
-            <text x="60" y="56" className="rag-center-num">{ragTotal}</text>
-            <text x="60" y="72" className="rag-center-lbl">Reqs</text>
-          </svg>
-          <ul className="rag-legend">
-            {rag.map((d) => (
-              <li key={d.name}>
-                <span className="rag-dot" style={{ background: d.color }} />
-                {d.name}
-                <strong>{d.value}</strong>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <DonutChart data={rag} centerLabel="Reqs" total={ragTotal} />
       </div>
 
-      {/* Position status — donut (Open vs Closed) */}
       <div className="chart-card">
         <h3><IconPie /> Position Status</h3>
-        <div className="rag-gauge">
-          <svg viewBox="0 0 120 120" className="rag-svg">
-            <circle cx="60" cy="60" r="50" className="rag-bg" />
-            {(() => {
-              let acc = 0;
-              return status.map((d) => {
-                const frac = d.value / statusTotal;
-                const dash = frac * (2 * Math.PI * 50);
-                const el = (
-                  <circle
-                    key={d.name}
-                    cx="60" cy="60" r="50"
-                    className="rag-seg"
-                    style={{ stroke: d.color, strokeDasharray: `${dash} ${2 * Math.PI * 50}`, strokeDashoffset: -acc }}
-                    transform="rotate(-90 60 60)"
-                  />
-                );
-                acc += dash;
-                return el;
-              });
-            })()}
-            <text x="60" y="56" className="rag-center-num">{statusTotal}</text>
-            <text x="60" y="72" className="rag-center-lbl">Positions</text>
-          </svg>
-          <ul className="rag-legend">
-            {status.map((d) => (
-              <li key={d.name}>
-                <span className="rag-dot" style={{ background: d.color }} />
-                {d.name}
-                <strong>{d.value}</strong>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <DonutChart data={status} centerLabel="Positions" total={statusTotal} />
       </div>
     </div>
   );
