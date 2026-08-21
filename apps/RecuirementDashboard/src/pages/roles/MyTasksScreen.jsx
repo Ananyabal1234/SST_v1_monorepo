@@ -4,7 +4,9 @@ import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
 import { IconBriefcase, IconClipboardCheck } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import CandidateResumeSection from '../../components/CandidateResumeSection';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { EmptyState, ScreenSkeleton } from '../../components/ui';
 
 export default function MyTasksScreen() {
   const { user } = useAuth();
@@ -48,7 +50,7 @@ export default function MyTasksScreen() {
     return () => { active = false; };
   }, [user]);
 
-  if (loading) return <div className="screen-loading"><div className="spinner" /></div>;
+  if (loading) return <ScreenSkeleton rows={6} />;
 
   return (
     <div className="my-tasks-screen">
@@ -60,7 +62,13 @@ export default function MyTasksScreen() {
         </div>
       </div>
       <div className="my-tasks-grid">
-        {tasks.length === 0 && <div className="cand-empty">Not found</div>}
+        {tasks.length === 0 && (
+          <EmptyState
+            icon={IconBriefcase}
+            title="No task history"
+            description="Requirements you own will appear here."
+          />
+        )}
         {tasks.map((t) => (
           <div
             key={t.id}
@@ -125,6 +133,11 @@ export default function MyTasksScreen() {
                 <div className="detail-item"><span className="detail-label">Offer</span><span className="detail-value">{viewingCandidate.offer?.statusCode || '—'}</span></div>
                 <div className="detail-item"><span className="detail-label">Onboarding</span><span className="detail-value">{viewingCandidate.onboarding?.statusCode || '—'}</span></div>
               </div>
+              <CandidateResumeSection
+                candidateId={viewingCandidate.id || viewingCandidate.publicId}
+                initialHasResume={viewingCandidate.hasResume}
+                initialFileName={viewingCandidate.resumeFileName}
+              />
             </div>
             <div className="modal-foot">
               <button type="button" className="filter-clear" onClick={() => setViewingCandidate(null)}>Close</button>

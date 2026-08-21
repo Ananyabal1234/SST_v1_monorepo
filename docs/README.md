@@ -8,6 +8,7 @@ Complete enterprise documentation for building **Service Staffing Tracker (SST)*
 
 | Audience | Start here |
 |----------|------------|
+| **Beginners — live codebase walkthrough** | **[FLOW.md](./FLOW.md)** |
 | Team Lead / new engineers (high-level overview) | [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) |
 | Beginners — high-level architecture (plain language) | [06-system-design/BEGINNER_HIGH_LEVEL_ARCHITECTURE.md](./06-system-design/BEGINNER_HIGH_LEVEL_ARCHITECTURE.md) |
 | New to Node.js / NestJS | [21-guides/NESTJS_DEVELOPER_HANDBOOK.md](./21-guides/NESTJS_DEVELOPER_HANDBOOK.md) |
@@ -30,13 +31,14 @@ Complete enterprise documentation for building **Service Staffing Tracker (SST)*
 
 ## Reading order (recommended)
 
-1. [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — enterprise high-level engineering overview (Team Lead onboarding)  
-2. [00-initiation](./00-initiation/) → [01-business-analysis](./01-business-analysis/) → [02-srs](./02-srs/) → [03-prd](./03-prd/)  
-3. [04-domain](./04-domain/) → [05-ux](./05-ux/)  
-4. [06-system-design](./06-system-design/) → [07-database](./07-database/) → [08-backend](./08-backend/) → [09-frontend](./09-frontend/) → [10-api](./10-api/) → [11-security](./11-security/)  
-5. [12-planning](./12-planning/) → [13-monorepo](./13-monorepo/) → [14-standards](./14-standards/)  
-6. [15-testing](./15-testing/) → [16-cicd](./16-cicd/) → [17-local-deployment](./17-local-deployment/) → [18-monitoring](./18-monitoring/)  
-7. [19-cloud](./19-cloud/) → [20-maintenance](./20-maintenance/) → [21-guides](./21-guides/) (includes [NestJS handbook](./21-guides/NESTJS_DEVELOPER_HANDBOOK.md))  
+1. [FLOW.md](./FLOW.md) — beginner one-stop: monorepo, boot, auth, tabs, pipeline, and how screens call the API  
+2. [DEVELOPER_GUIDE.md](./DEVELOPER_GUIDE.md) — enterprise high-level engineering overview (Team Lead onboarding)  
+3. [00-initiation](./00-initiation/) → [01-business-analysis](./01-business-analysis/) → [02-srs](./02-srs/) → [03-prd](./03-prd/)  
+4. [04-domain](./04-domain/) → [05-ux](./05-ux/)  
+5. [06-system-design](./06-system-design/) → [07-database](./07-database/) → [08-backend](./08-backend/) → [09-frontend](./09-frontend/) → [10-api](./10-api/) → [11-security](./11-security/)  
+6. [12-planning](./12-planning/) → [13-monorepo](./13-monorepo/) → [14-standards](./14-standards/)  
+7. [15-testing](./15-testing/) → [16-cicd](./16-cicd/) → [17-local-deployment](./17-local-deployment/) → [18-monitoring](./18-monitoring/)  
+8. [19-cloud](./19-cloud/) → [20-maintenance](./20-maintenance/) → [21-guides](./21-guides/) (includes [NestJS handbook](./21-guides/NESTJS_DEVELOPER_HANDBOOK.md))  
 
 ## Document catalog
 

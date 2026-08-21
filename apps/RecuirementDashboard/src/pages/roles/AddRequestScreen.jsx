@@ -7,6 +7,7 @@ import TaOwnersMultiSelect from '../../components/TaOwnersMultiSelect';
 import { IconBriefcase, IconUser, IconTarget, IconFolderOpen, IconWallet, IconMapPin, IconClock, IconPlus, IconCalendar, IconFlag } from '../../components/Icons';
 
 import { PageHeader } from '../../components/ui';
+import { useToast } from '../../context/ToastContext';
 
 const EMPTY = {
   requirementDate: '',
@@ -46,6 +47,21 @@ const FIELDS = [
   { key: 'remarks', label: 'Job Description', type: 'text', icon: IconBriefcase, placeholder: 'Optional job description', required: false },
 ];
 
+const FIELD_SECTIONS = [
+  {
+    legend: 'Role details',
+    keys: ['requirementDate', 'clientName', 'roleSkill', 'jobFamilyName', 'numberOfPositions', 'priorityCode', 'jobLocation'],
+  },
+  {
+    legend: 'Owners',
+    keys: ['salesOwnerId'],
+  },
+  {
+    legend: 'Dates & budget',
+    keys: ['taHandoffDate', 'targetClosureDate', 'experience', 'minBudget', 'maxBudget', 'durationMonths', 'remarks'],
+  },
+];
+
 function findByName(list, name) {
   const needle = String(name || '').trim().toLowerCase();
   if (!needle) return null;
@@ -67,6 +83,7 @@ function memberLoadError(err, fallback) {
 
 export default function AddRequestScreen() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isSales = user?.userType === 'sales';
   const canAssign = ['admin', 'sales', 'sales_lead'].includes(user?.userType);
 
@@ -269,6 +286,7 @@ export default function AddRequestScreen() {
             ? 'Requirement created and sent to TA Lead(s) for TA assignment.'
             : 'Requirement created. All TA Leads have been notified.';
       setSuccess(res.message || okMsg);
+      toast(res.message || okMsg);
       setForm({ ...EMPTY, ...(isSales && user?.id ? { salesOwnerId: user.id } : {}) });
       setMode('none');
     } catch (err) {
@@ -296,8 +314,14 @@ export default function AddRequestScreen() {
       />
 
       <form className="add-request-form" onSubmit={handleSubmit}>
-        <div className="add-request-grid">
-          {FIELDS.map((f) => (
+        {FIELD_SECTIONS.map((section) => (
+          <fieldset key={section.legend} className="form-section">
+            <legend>{section.legend}</legend>
+            <div className="add-request-grid">
+              {section.keys.map((key) => {
+                const f = FIELDS.find((item) => item.key === key);
+                if (!f) return null;
+                return (
             <label key={f.key} className="add-field">
               <span className="add-label">
                 <f.icon />
@@ -365,8 +389,11 @@ export default function AddRequestScreen() {
                 />
               )}
             </label>
-          ))}
-        </div>
+                );
+              })}
+            </div>
+          </fieldset>
+        ))}
 
         {canAssign && (
           <div className="assign-mode-block">

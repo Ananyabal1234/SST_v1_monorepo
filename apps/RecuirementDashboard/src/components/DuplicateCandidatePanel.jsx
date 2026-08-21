@@ -1,18 +1,44 @@
 import { useState } from 'react';
+import { formatDate } from '../utils/formatDate';
+import { derivePipelineStage } from '../utils/pipelineStage';
 
-function fmtDate(value) {
-  if (!value) return '—';
-  return String(value).slice(0, 10);
+function matchLabel(matchedBy) {
+  if (matchedBy === 'both') return 'Email + mobile';
+  if (matchedBy === 'email') return 'Email';
+  if (matchedBy === 'mobile') return 'Mobile';
+  return null;
 }
 
-export default function DuplicateCandidatePanel({ loading, error, data }) {
+function alreadyOnRequirement(row, currentRequirementId, currentCandidates) {
+  const email = String(row.email || '').trim().toLowerCase();
+  const mobile = String(row.mobile || '').trim();
+  const onCurrentList = currentCandidates.some((c) => {
+    const cEmail = String(c.email || '').trim().toLowerCase();
+    const cMobile = String(c.mobile || '').trim();
+    return (email && cEmail === email) || (mobile && cMobile === mobile);
+  });
+  return (
+    onCurrentList
+    || row.requirementId === currentRequirementId
+    || row.requirement?.id === currentRequirementId
+  );
+}
+
+export default function DuplicateCandidatePanel({
+  loading,
+  error,
+  data,
+  currentRequirementId,
+  currentCandidates = [],
+  onClone,
+}) {
   const [expanded, setExpanded] = useState(true);
   const matches = data?.matches || [];
 
   if (loading) {
     return (
       <div className="duplicate-panel duplicate-panel--loading">
-        Checking for prior candidate records…
+        Checking prior records…
       </div>
     );
   }
@@ -38,11 +64,13 @@ export default function DuplicateCandidatePanel({ loading, error, data }) {
       <div className="duplicate-panel-head">
         <div>
           <strong className="duplicate-panel-title">
-            Possible duplicate — {matches.length} prior record{matches.length === 1 ? '' : 's'}
+            Possible duplicate
+            <em>{matches.length}</em>
           </strong>
           <p className="duplicate-panel-sub">
-            This person appears in other requirement pipelines ({matchHints.join(', ')}).
-            You can still save; review history before proceeding.
+            Already in {matches.length === 1 ? 'another' : 'other'} pipeline
+            {matchHints.length ? ` (${matchHints.join(', ')})` : ''}.
+            Review before saving — you can still add a new record.
           </p>
         </div>
         <button
@@ -50,57 +78,76 @@ export default function DuplicateCandidatePanel({ loading, error, data }) {
           className="duplicate-panel-toggle"
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? 'Hide history' : 'Show history'}
+          {expanded ? 'Hide' : 'Show'}
         </button>
       </div>
 
       {expanded && (
-        <div className="duplicate-panel-table-wrap">
-          <table className="duplicate-panel-table">
-            <thead>
-              <tr>
-                <th>Candidate ID</th>
-                <th>Requirement</th>
-                <th>Client</th>
-                <th>Role</th>
-                <th>Pipeline</th>
-                <th>Stage</th>
-                <th>Status</th>
-                <th>Round</th>
-                <th>Selected</th>
-                <th>Offer</th>
-                <th>Onboarding</th>
-                <th>Remarks</th>
-                <th>Submitted</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {matches.map((row) => (
-                <tr key={row.id}>
-                  <td>{row.publicId || row.id}</td>
-                  <td>{row.requirement?.publicId || '—'}</td>
-                  <td>{row.requirement?.clientName || '—'}</td>
-                  <td>{row.requirement?.roleSkill || '—'}</td>
-                  <td>
-                    <span className="duplicate-pipeline-badge">
-                      {row.pipelineLabel || row.pipelineStage || '—'}
+        <ul className="duplicate-panel-list">
+          {matches.map((row) => {
+            const { pipelineStage, pipelineLabel } = derivePipelineStage(row);
+            const onReq = alreadyOnRequirement(row, currentRequirementId, currentCandidates);
+            const matched = matchLabel(row.matchedBy);
+            const req = row.requirement || {};
+            const status = row.candidateStatus || row.feedbackCode || '';
+            const when = formatDate(row.profileSubmittedDate || row.createdAt, '');
+            return (
+              <li key={row.id} className="duplicate-card">
+                <div className="duplicate-card-main">
+                  <div className="duplicate-card-top">
+                    <strong className="duplicate-card-name">
+                      {row.name || row.publicId || 'Candidate'}
+                    </strong>
+                    <span
+                      className={`duplicate-pipeline-badge is-${String(pipelineStage || '').toLowerCase()}`}
+                    >
+                      {pipelineLabel}
+                      {row.interviewRound ? ` · ${row.interviewRound}` : ''}
                     </span>
-                  </td>
-                  <td>{row.stageCode || '—'}</td>
-                  <td>{row.candidateStatus || row.feedbackCode || '—'}</td>
-                  <td>{row.interviewRound || '—'}</td>
-                  <td>{row.selected ? 'Yes' : 'No'}</td>
-                  <td>{row.offer?.statusCode || '—'}</td>
-                  <td>{row.onboarding?.statusCode || '—'}</td>
-                  <td className="duplicate-remarks">{row.remarks || '—'}</td>
-                  <td>{fmtDate(row.profileSubmittedDate)}</td>
-                  <td>{fmtDate(row.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </div>
+                  <p className="duplicate-card-meta">
+                    <span>{row.publicId || '—'}</span>
+                    {req.publicId ? <span>{req.publicId}</span> : null}
+                    {when ? <span>{when}</span> : null}
+                  </p>
+                  <p className="duplicate-card-role">
+                    {[req.clientName, req.roleSkill].filter(Boolean).join(' · ') || 'Unknown requirement'}
+                  </p>
+                  <div className="duplicate-card-tags">
+                    {matched && (
+                      <span className="duplicate-match-chip">Matched on {matched}</span>
+                    )}
+                    {status ? <span className="duplicate-status-chip">{status}</span> : null}
+                    {row.selected && !['Selected', 'SELECTED'].includes(status) ? (
+                      <span className="duplicate-status-chip">Selected</span>
+                    ) : null}
+                    {row.offer?.statusCode ? (
+                      <span className="duplicate-status-chip">Offer {row.offer.statusCode}</span>
+                    ) : null}
+                    {row.onboarding?.statusCode ? (
+                      <span className="duplicate-status-chip">Onboarding {row.onboarding.statusCode}</span>
+                    ) : null}
+                  </div>
+                </div>
+                {onClone && (
+                  <div className="duplicate-card-action">
+                    {onReq ? (
+                      <span className="duplicate-already">On this requirement</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="duplicate-add-btn"
+                        onClick={() => onClone(row)}
+                      >
+                        Add here
+                      </button>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
       )}
     </div>
   );

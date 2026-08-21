@@ -89,7 +89,7 @@
 .add-submit,
 .hr-detail-save,
 .add-cand-btn,
-.login-form button {
+.login-form > button[type='submit'] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -108,26 +108,26 @@
 .add-submit:hover,
 .hr-detail-save:hover,
 .add-cand-btn:hover,
-.login-form button:hover {
+.login-form > button[type='submit']:hover {
   opacity: 0.95;
 }
 
 .add-submit:active,
 .hr-detail-save:active,
 .add-cand-btn:active,
-.login-form button:active {
+.login-form > button[type='submit']:active {
   transform: translateY(1px);
 }
 
 .add-submit:disabled,
 .hr-detail-save:disabled,
 .add-cand-btn:disabled,
-.login-form button:disabled {
+.login-form > button[type='submit']:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.login-form button {
+.login-form > button[type='submit'] {
   width: 100%;
   margin-top: 6px;
   padding: 12px;

@@ -12,12 +12,15 @@ import { OffersService } from '../offers/offers.service';
 import { RequirementsService } from '../requirements/requirements.service';
 import {
   CreateCandidateDto,
+  ImportCandidatesDto,
   UpdateCandidateDto,
 } from './dto/candidates.dto';
 import { AuthUser } from '../auth/decorators/current-user.decorator';
 import { derivePipelineStage } from '../common/pipeline-stage';
 import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notifications/notifications.service';
 import { hrCandidateSelectedEmail } from '../mail/templates';
+import { normalizedResumeMeta } from './candidate-resume.util';
 
 type StatusFields = {
   selected?: boolean;
@@ -80,6 +83,10 @@ const duplicateHistoryOnboardingInclude = {
   },
 } as const;
 
+const candidateWithoutResumeData = {
+  omit: { resumeData: true },
+} as const;
+
 @Injectable()
 export class CandidatesService {
   constructor(
@@ -89,6 +96,7 @@ export class CandidatesService {
     private readonly offers: OffersService,
     private readonly requirements: RequirementsService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private isPublicId(id: string) {
@@ -126,8 +134,18 @@ export class CandidatesService {
       offer,
       onboarding,
     });
+    const resumeData = row.resumeData;
+    const hasResume =
+      Boolean(row.resumeFileName) ||
+      (resumeData != null &&
+        (Buffer.isBuffer(resumeData)
+          ? resumeData.length > 0
+          : resumeData instanceof Uint8Array
+            ? resumeData.byteLength > 0
+            : true));
+    const { resumeData: _omit, ...rest } = row;
     return {
-      ...row,
+      ...rest,
       id: row.id,
       publicId: row.publicId,
       requirementId: row.requirementId,
@@ -138,6 +156,10 @@ export class CandidatesService {
       candidateStatus: this.deriveCandidateStatus(selected, feedbackCode),
       pipelineStage: pipeline.pipelineStage,
       pipelineLabel: pipeline.pipelineLabel,
+      hasResume,
+      resumeFileName: hasResume ? (row.resumeFileName as string | null) : null,
+      resumeMimeType: hasResume ? (row.resumeMimeType as string | null) : null,
+      resumeSizeBytes: hasResume ? (row.resumeSizeBytes as number | null) : null,
     };
   }
 
@@ -181,8 +203,12 @@ export class CandidatesService {
     if (!candidate) return;
 
     const hrs = await this.prisma.user.findMany({
-      where: { role: Role.HR, isActive: true, deletedAt: null },
-      select: { email: true, fullName: true },
+      where: {
+        role: { in: [Role.HR, Role.HR_LEAD] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true, email: true, fullName: true },
     });
 
     for (const hr of hrs) {
@@ -203,6 +229,17 @@ export class CandidatesService {
         scenario: 'candidate-selected-hr',
       });
     }
+    void this.notifications.createMany(
+      hrs.map((hr) => ({
+        userId: hr.id,
+        type: 'CANDIDATE_SELECTED',
+        title: `Selected — ${candidate.name}`,
+        body: `${candidate.publicId} · ${candidate.requirement?.publicId || '—'} · ${candidate.requirement?.client?.name || '—'}`,
+        entityType: 'Candidate',
+        entityId: candidate.id,
+        linkTab: 'hr-offers',
+      })),
+    );
   }
 
   private async assertLookupCode(
@@ -604,6 +641,7 @@ export class CandidatesService {
     const [items, total] = await Promise.all([
       this.prisma.candidate.findMany({
         where,
+        ...candidateWithoutResumeData,
         include: {
           requirement: {
             select: {
@@ -632,6 +670,7 @@ export class CandidatesService {
   async get(id: string): Promise<any> {
     const row = await this.prisma.candidate.findFirst({
       where: this.whereById(id),
+      ...candidateWithoutResumeData,
       include: {
         requirement: {
           include: { client: true },
@@ -948,5 +987,375 @@ export class CandidatesService {
       },
     });
     return this.toCandidateResponse(refreshed ?? row);
+  }
+
+  async uploadResume(
+    id: string,
+    file: Express.Multer.File,
+    actor: AuthUser,
+  ): Promise<any> {
+    const before = await this.prisma.candidate.findFirst({
+      where: this.whereById(id),
+    });
+    if (!before) throw new NotFoundException('Candidate not found');
+    await this.requirements.assertActorCanMutateCandidates(
+      before.requirementId,
+      actor,
+    );
+
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: before.requirementId, deletedAt: null },
+    });
+    if (!req) throw new NotFoundException('Requirement not found');
+    this.assertRequirementAllowsRecruiting(req.status);
+
+    const meta = normalizedResumeMeta(file);
+    const row = await this.prisma.candidate.update({
+      where: { id: before.id },
+      data: meta,
+      ...candidateWithoutResumeData,
+      include: {
+        requirement: {
+          select: { id: true, publicId: true, roleSkill: true },
+        },
+        ...candidateOfferOnboardingInclude,
+      },
+    });
+    await this.audit.log({
+      entityType: 'Candidate',
+      entityId: before.id,
+      action: 'UPDATE',
+      actorUserId: actor.id,
+      before: {
+        resumeFileName: before.resumeFileName,
+        resumeMimeType: before.resumeMimeType,
+        resumeSizeBytes: before.resumeSizeBytes,
+      },
+      after: {
+        resumeFileName: row.resumeFileName,
+        resumeMimeType: row.resumeMimeType,
+        resumeSizeBytes: row.resumeSizeBytes,
+      },
+    });
+    const flags = await this.duplicateFlags(
+      row.mobileNormalized,
+      row.emailNormalized,
+      row.id,
+    );
+    return this.wrapCandidate(
+      { ...this.toCandidateResponse(row), ...flags },
+      'Resume uploaded successfully',
+    );
+  }
+
+  async getResume(id: string): Promise<{
+    buffer: Buffer;
+    fileName: string;
+    mimeType: string;
+  }> {
+    const row = await this.prisma.candidate.findFirst({
+      where: this.whereById(id),
+      select: {
+        resumeFileName: true,
+        resumeMimeType: true,
+        resumeData: true,
+      },
+    });
+    if (!row?.resumeData?.length) {
+      throw new NotFoundException('Resume not found for this candidate');
+    }
+    return {
+      buffer: Buffer.from(row.resumeData),
+      fileName: row.resumeFileName || 'resume',
+      mimeType: row.resumeMimeType || 'application/octet-stream',
+    };
+  }
+
+  async talentPool(requirementId: string, q?: string): Promise<{ items: any[] }> {
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: requirementId, deletedAt: null },
+      select: {
+        id: true,
+        roleSkill: true,
+        experience: true,
+        jobLocation: true,
+        jobFamilyId: true,
+      },
+    });
+    if (!req) throw new NotFoundException('Requirement not found');
+
+    const tokens = this.tokenize(`${q || ''} ${req.roleSkill || ''}`);
+    if (!tokens.length) return { items: [] };
+
+    const or: Prisma.CandidateWhereInput[] = [];
+    for (const t of tokens) {
+      or.push(
+        { position: { contains: t, mode: 'insensitive' } },
+        { jobFamily: { contains: t, mode: 'insensitive' } },
+        { name: { contains: t, mode: 'insensitive' } },
+        { requirement: { roleSkill: { contains: t, mode: 'insensitive' } } },
+        { requirement: { jobLocation: { contains: t, mode: 'insensitive' } } },
+        { requirement: { experience: { contains: t, mode: 'insensitive' } } },
+      );
+    }
+
+    const rows = await this.prisma.candidate.findMany({
+      where: {
+        deletedAt: null,
+        requirementId: { not: req.id },
+        OR: or,
+      },
+      take: 80,
+      orderBy: [{ selected: 'desc' }, { createdAt: 'desc' }],
+      ...candidateWithoutResumeData,
+      include: {
+        requirement: {
+          select: {
+            id: true,
+            publicId: true,
+            roleSkill: true,
+            jobFamilyId: true,
+            jobLocation: true,
+            client: { select: { name: true } },
+          },
+        },
+        ...candidateOfferOnboardingInclude,
+      },
+    });
+
+    const scored = rows
+      .map((row) => {
+        let score = 0;
+        if (row.selected) score += 100;
+        if (row.offer) score += 40;
+        if (req.jobFamilyId && row.requirement?.jobFamilyId === req.jobFamilyId) {
+          score += 30;
+        }
+        const hay = `${row.position || ''} ${row.jobFamily || ''} ${row.requirement?.roleSkill || ''}`.toLowerCase();
+        for (const t of tokens) {
+          if (hay.includes(t.toLowerCase())) score += 8;
+        }
+        return { score, row };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 25);
+
+    return {
+      items: scored.map(({ row }) => {
+        const mapped = this.toCandidateResponse(row);
+        return {
+          ...mapped,
+          requirement: {
+            id: row.requirement?.id,
+            publicId: row.requirement?.publicId,
+            roleSkill: row.requirement?.roleSkill,
+            clientName: row.requirement?.client?.name,
+            jobLocation: row.requirement?.jobLocation,
+          },
+        };
+      }),
+    };
+  }
+
+  async importOntoRequirement(
+    dto: ImportCandidatesDto,
+    actor: AuthUser,
+  ): Promise<{
+    created: any[];
+    skipped: Array<{ row: number; reason: string; email?: string; mobile?: string }>;
+    errors: Array<{ row: number; message: string }>;
+  }> {
+    await this.requirements.assertActorCanMutateCandidates(
+      dto.requirementId,
+      actor,
+    );
+    await this.requirements.syncFillStatus(dto.requirementId, actor.id);
+    const req = await this.prisma.requirement.findFirst({
+      where: { id: dto.requirementId, deletedAt: null },
+    });
+    if (!req) throw new NotFoundException('Requirement not found');
+    this.assertRequirementAllowsRecruiting(req.status);
+
+    const parsed = this.normalizeImportRows(dto);
+    if (!parsed.length) {
+      throw new BadRequestException(
+        'Provide CSV with header name,email,mobile or a rows array',
+      );
+    }
+    if (parsed.length > 50) {
+      throw new BadRequestException('Import is limited to 50 rows');
+    }
+
+    const existing = await this.prisma.candidate.findMany({
+      where: { requirementId: dto.requirementId, deletedAt: null },
+      select: { emailNormalized: true, mobileNormalized: true },
+    });
+    const emails = new Set(existing.map((e) => e.emailNormalized).filter(Boolean));
+    const mobiles = new Set(
+      existing.map((e) => e.mobileNormalized).filter(Boolean),
+    );
+
+    const created: any[] = [];
+    const skipped: Array<{
+      row: number;
+      reason: string;
+      email?: string;
+      mobile?: string;
+    }> = [];
+    const errors: Array<{ row: number; message: string }> = [];
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const item of parsed) {
+      const emailNorm = item.email ? normalizeEmail(item.email) : '';
+      const mobileNorm = item.mobile ? normalizeMobile(item.mobile) : '';
+      if (
+        (emailNorm && emails.has(emailNorm)) ||
+        (mobileNorm && mobiles.has(mobileNorm))
+      ) {
+        skipped.push({
+          row: item.row,
+          reason: 'Already on this requirement',
+          email: item.email,
+          mobile: item.mobile,
+        });
+        continue;
+      }
+      try {
+        const res = await this.create(
+          {
+            requirementId: dto.requirementId,
+            name: item.name,
+            email: item.email,
+            mobile: item.mobile,
+            source: item.source || 'Import',
+            remarks: item.remarks || undefined,
+            stageCode: 'SUBMITTED_TO_SPOC',
+            candidateStatus: 'Pending',
+            profileSubmittedDate: today,
+            position: req.roleSkill,
+            jobFamily: undefined,
+          },
+          actor,
+        );
+        created.push(res?.candidate || res);
+        if (emailNorm) emails.add(emailNorm);
+        if (mobileNorm) mobiles.add(mobileNorm);
+      } catch (err) {
+        const message =
+          err instanceof BadRequestException
+            ? Array.isArray(err.message)
+              ? err.message.join(', ')
+              : String(err.message)
+            : err instanceof Error
+              ? err.message
+              : 'Failed to import row';
+        errors.push({ row: item.row, message });
+      }
+    }
+
+    return { created, skipped, errors };
+  }
+
+  private tokenize(text: string): string[] {
+    const stop = new Set([
+      'the',
+      'and',
+      'or',
+      'of',
+      'for',
+      'a',
+      'an',
+      'in',
+      'to',
+      'with',
+      'on',
+    ]);
+    return String(text || '')
+      .split(/[^a-zA-Z0-9.+#]+/)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 2 && !stop.has(t.toLowerCase()))
+      .slice(0, 8);
+  }
+
+  private normalizeImportRows(dto: ImportCandidatesDto): Array<{
+    row: number;
+    name: string;
+    email: string;
+    mobile: string;
+    source?: string;
+    remarks?: string;
+  }> {
+    if (Array.isArray(dto.rows) && dto.rows.length) {
+      return dto.rows.map((r, idx) => ({
+        row: idx + 1,
+        name: String(r.name || '').trim(),
+        email: String(r.email || '').trim(),
+        mobile: String(r.mobile || '').trim(),
+        source: r.source?.trim() || undefined,
+        remarks: r.remarks?.trim() || undefined,
+      }));
+    }
+    const csv = String(dto.csv || '').trim();
+    if (!csv) return [];
+    const table = this.parseCsv(csv);
+    if (table.length < 2) return [];
+    const header = table[0].map((h) => h.trim().toLowerCase());
+    const nameIdx = header.indexOf('name');
+    const emailIdx = header.indexOf('email');
+    const mobileIdx = header.indexOf('mobile');
+    if (nameIdx < 0 || emailIdx < 0 || mobileIdx < 0) {
+      throw new BadRequestException('CSV must include name,email,mobile columns');
+    }
+    const sourceIdx = header.indexOf('source');
+    const remarksIdx = header.indexOf('remarks');
+    return table.slice(1).map((cells, idx) => ({
+      row: idx + 2,
+      name: (cells[nameIdx] || '').trim(),
+      email: (cells[emailIdx] || '').trim(),
+      mobile: (cells[mobileIdx] || '').trim(),
+      source: sourceIdx >= 0 ? (cells[sourceIdx] || '').trim() || undefined : undefined,
+      remarks:
+        remarksIdx >= 0 ? (cells[remarksIdx] || '').trim() || undefined : undefined,
+    }));
+  }
+
+  private parseCsv(content: string): string[][] {
+    const rows: string[][] = [];
+    let row: string[] = [];
+    let cell = '';
+    let quoted = false;
+    const text = content.replace(/^\uFEFF/, '');
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"') {
+          if (text[i + 1] === '"') {
+            cell += '"';
+            i += 1;
+          } else {
+            quoted = false;
+          }
+        } else {
+          cell += ch;
+        }
+      } else if (ch === '"') {
+        quoted = true;
+      } else if (ch === ',') {
+        row.push(cell);
+        cell = '';
+      } else if (ch === '\n') {
+        row.push(cell.replace(/\r$/, ''));
+        rows.push(row);
+        row = [];
+        cell = '';
+      } else {
+        cell += ch;
+      }
+    }
+    if (cell.length || row.length) {
+      row.push(cell.replace(/\r$/, ''));
+      rows.push(row);
+    }
+    return rows.filter((r) => r.some((c) => String(c).trim()));
   }
 }

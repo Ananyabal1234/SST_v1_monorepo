@@ -1,11 +1,19 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { get, put, post } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import { useAuth } from '../../context/AuthContext';
-import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit } from '../../components/Icons';
+import { useToast } from '../../context/ToastContext';
+import { IconList, IconFilter, IconBriefcase, IconFlag, IconClipboardCheck, IconEdit, IconX } from '../../components/Icons';
 import RequirementPipelineBoard from '../../components/RequirementPipelineBoard';
+import RequirementNotes from '../../components/RequirementNotes';
+import CandidateResumeSection from '../../components/CandidateResumeSection';
 import TaOwnersMultiSelect, { formatTaOwnerNames, formatTaLeadNames } from '../../components/TaOwnersMultiSelect';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { formatDate, toDateInput } from '../../utils/formatDate';
+import { matchesQuery, useDebouncedValue } from '../../utils/listSearch';
+import TableSearch from '../../components/TableSearch';
+import { EmptyState, ScreenSkeleton } from '../../components/ui';
 
 function normalizeMemberList(res) {
   if (Array.isArray(res)) return res;
@@ -27,10 +35,14 @@ function memberLoadError(err, fallback) {
 // that PUTs to /api/v1/requirements/{id}.
 export default function YourRequirementsScreen() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [searchParams] = useSearchParams();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({ clientId: '', priorityCode: '', status: '' });
+  const [listSearch, setListSearch] = useState('');
+  const listSearchQ = useDebouncedValue(listSearch);
   const [editing, setEditing] = useState(null); // requirement being edited
   const [viewingRequirement, setViewingRequirement] = useState(null); // requirement pipeline view
   const [viewingCandidate, setViewingCandidate] = useState(null);
@@ -63,7 +75,7 @@ export default function YourRequirementsScreen() {
     let active = true;
     setLoading(true);
     setError(null);
-    get(ENDPOINTS.REQUIREMENTS)
+    get(`${ENDPOINTS.REQUIREMENTS}?sort=createdAt:desc&pageSize=100`)
       .then((res) => {
         const list = Array.isArray(res)
           ? res
@@ -143,6 +155,13 @@ export default function YourRequirementsScreen() {
 
   useEffect(load, [user]);
 
+  useEffect(() => {
+    const req = searchParams.get('req');
+    if (!req || !items.length) return;
+    const match = items.find((r) => r.id === req || r.publicId === req);
+    if (match) setViewingRequirement(match);
+  }, [searchParams, items]);
+
   // Distinct clients for the filter dropdown.
   const clients = useMemo(() => {
     const map = new Map();
@@ -171,19 +190,32 @@ export default function YourRequirementsScreen() {
     user?.userType === 'sales_lead';
 
   const visible = useMemo(() => {
-    return items.filter((r) => {
-      if (filters.clientId && r.client?.id !== filters.clientId) return false;
-      if (filters.priorityCode && (r.priorityCode || '') !== filters.priorityCode) return false;
-      if (filters.status && (r.status || '') !== filters.status) return false;
-      return true;
-    });
-  }, [items, filters]);
+    return items
+      .filter((r) => {
+        if (filters.clientId && r.client?.id !== filters.clientId) return false;
+        if (filters.priorityCode && (r.priorityCode || '') !== filters.priorityCode) return false;
+        if (filters.status && (r.status || '') !== filters.status) return false;
+        return matchesQuery(
+          listSearchQ,
+          r.publicId,
+          r.client?.name,
+          r.roleSkill,
+          r.jobFamily?.name,
+          r.salesOwner?.fullName,
+          r.jobLocation,
+        );
+      })
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  }, [items, filters, listSearchQ]);
 
   const myRequirements = useMemo(() => items.filter(isOwnedByCurrentSalesUser), [items, user]);
 
   const update = (key, value) => setFilters((f) => ({ ...f, [key]: value }));
-  const clearFilters = () => setFilters({ clientId: '', priorityCode: '', status: '' });
-  const hasFilters = filters.clientId || filters.priorityCode || filters.status;
+  const clearFilters = () => {
+    setFilters({ clientId: '', priorityCode: '', status: '' });
+    setListSearch('');
+  };
+  const hasFilters = Boolean(filters.clientId || filters.priorityCode || filters.status || listSearch.trim());
 
   const changeRequirementStatus = async (requirement, nextStatus) => {
     if (!requirement?.id || !canManageStatus) return;
@@ -207,6 +239,13 @@ export default function YourRequirementsScreen() {
         r.id === requirement.id ? { ...r, ...updated, status: next } : r
       )));
       setStatusMessage(
+        next === 'ON_HOLD'
+          ? `Requirement ${requirement.publicId || ''} put on hold`
+          : next === 'ACTIVE'
+            ? `Requirement ${requirement.publicId || ''} resumed`
+            : `Requirement ${requirement.publicId || ''} cancelled`,
+      );
+      toast(
         next === 'ON_HOLD'
           ? `Requirement ${requirement.publicId || ''} put on hold`
           : next === 'ACTIVE'
@@ -240,7 +279,7 @@ export default function YourRequirementsScreen() {
     const mode = ownerIds.length ? 'owners' : leadIds.length ? 'lead' : 'none';
     setAssignMode(mode);
     setForm({
-      requirementDate: (r.requirementDate || '').slice(0, 10),
+      requirementDate: toDateInput(r.requirementDate),
       clientId: r.client?.id || r.clientId || '',
       roleSkill: r.roleSkill || '',
       jobFamilyId: r.jobFamily?.id || r.jobFamilyId || '',
@@ -249,8 +288,8 @@ export default function YourRequirementsScreen() {
       priorityCode: r.priorityCode || 'HIGH',
       taOwnerIds: ownerIds,
       taLeadIds: leadIds,
-      taHandoffDate: (r.taHandoffDate || '').slice(0, 10),
-      targetClosureDate: (r.targetClosureDate || '').slice(0, 10),
+      taHandoffDate: toDateInput(r.taHandoffDate),
+      targetClosureDate: toDateInput(r.targetClosureDate),
       remarks: r.remarks || '',
       experience: r.experience || '',
       jobLocation: r.jobLocation || '',
@@ -330,6 +369,7 @@ export default function YourRequirementsScreen() {
     try {
       await put(`${ENDPOINTS.REQUIREMENT_BY_ID}/${editing.id}`, payload);
       setEditSuccess('Requirement updated successfully');
+      toast('Requirement updated successfully');
       closeEdit();
       load(); // refresh the list
     } catch (err) {
@@ -340,7 +380,7 @@ export default function YourRequirementsScreen() {
   };
 
   return (
-    <div className="yr-screen">
+    <div className="yr-screen yr-requirements">
       <div className="yr-head">
         <span className="yr-badge"><IconList /></span>
         <div>
@@ -360,9 +400,42 @@ export default function YourRequirementsScreen() {
         <div className="filter-bar">
           <div className="filter-bar-head">
             <IconFilter />
-            Filters
-            {hasFilters && <span className="filter-count">{visible.length}</span>}
+            <span>Filters</span>
+            {hasFilters && <span className="filter-count">{[filters.clientId, filters.priorityCode, filters.status].filter(Boolean).length + (listSearch.trim() ? 1 : 0)} active</span>}
+            {hasFilters && (
+              <button type="button" className="filter-clear" onClick={clearFilters}>
+                Clear
+              </button>
+            )}
           </div>
+          {hasFilters && (
+            <div className="filter-chips" aria-label="Active filters">
+              {filters.clientId && (
+                <button type="button" className="filter-chip" onClick={() => update('clientId', '')}>
+                  Client: {clients.find((c) => c.id === filters.clientId)?.name || filters.clientId}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+              {filters.priorityCode && (
+                <button type="button" className="filter-chip" onClick={() => update('priorityCode', '')}>
+                  Priority: {filters.priorityCode}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+              {filters.status && (
+                <button type="button" className="filter-chip" onClick={() => update('status', '')}>
+                  Status: {filters.status}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+              {listSearch.trim() && (
+                <button type="button" className="filter-chip" onClick={() => setListSearch('')}>
+                  Search: {listSearch.trim()}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="filter-fields">
             <div className="filter-field">
               <span className="filter-label"><IconBriefcase /> Client</span>
@@ -391,10 +464,12 @@ export default function YourRequirementsScreen() {
                 ))}
               </select>
             </div>
-            {hasFilters && (
-              <button className="filter-clear" onClick={clearFilters}>Clear</button>
-            )}
           </div>
+          <TableSearch
+            value={listSearch}
+            onChange={setListSearch}
+            placeholder="Search req ID, client, role…"
+          />
         </div>
       )}
 
@@ -402,21 +477,23 @@ export default function YourRequirementsScreen() {
       {statusError && <div className="add-error">{statusError}</div>}
 
       {loading ? (
-        <div className="screen-loading"><div className="spinner" /></div>
+        <ScreenSkeleton rows={8} />
       ) : error ? (
         <div className="add-error">{error}</div>
       ) : items.length === 0 ? (
-        <div className="yr-empty">
-          <IconList />
-          <p>No requirements found. Use “Add Request” to raise one.</p>
-        </div>
+        <EmptyState
+          icon={IconList}
+          title="No requirements found"
+          description="Use Add Request to raise one."
+        />
       ) : visible.length === 0 ? (
-        <div className="yr-empty">
-          <IconList />
-          <p>No requirements match the selected filters.</p>
-        </div>
+        <EmptyState
+          icon={IconList}
+          title="No matching requirements"
+          description="Try a different search or clear filters."
+        />
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap yr-table-card">
           <table className="data-table yr-table">
             <thead>
               <tr>
@@ -425,6 +502,9 @@ export default function YourRequirementsScreen() {
                 <th>Role / Skill</th>
                 <th>Job Family</th>
                 <th>Positions</th>
+                <th className="yr-pulse-col">Fill</th>
+                <th className="yr-pulse-col">Pipeline</th>
+                <th className="yr-pulse-col">RAG</th>
                 <th>Priority</th>
                 <th>Job Location</th>
                 <th>Sales Owner</th>
@@ -443,7 +523,26 @@ export default function YourRequirementsScreen() {
                   <td>{r.roleSkill || '—'}</td>
                   <td>{r.jobFamily?.name || r.jobFamilyId || '—'}</td>
                   <td>{r.numberOfPositions ?? '—'}</td>
-                  <td>{r.priorityCode || '—'}</td>
+                  <td className="yr-pulse-col" title="Closed / open positions">
+                    {r.closedPositions ?? 0}/{r.openPositions ?? '—'}
+                  </td>
+                  <td className="yr-pulse-col">
+                    {r.furthestPipelineStage
+                      ? String(r.furthestPipelineStage).replace(/_/g, ' ')
+                      : '—'}
+                  </td>
+                  <td className="yr-pulse-col">
+                    {r.taHandoffSlaRag && r.taHandoffSlaRag !== 'NONE' ? (
+                      <span className={`yr-rag yr-rag--${String(r.taHandoffSlaRag).toLowerCase()}`}>
+                        {r.taHandoffSlaRag}
+                      </span>
+                    ) : '—'}
+                  </td>
+                  <td>
+                    {r.priorityCode ? (
+                      <span className={`yr-priority ${(r.priorityCode || '').toLowerCase()}`}>{r.priorityCode}</span>
+                    ) : '—'}
+                  </td>
                   <td>{r.jobLocation || '—'}</td>
                   <td>{r.salesOwner?.fullName || '—'}</td>
                   <td>{formatTaLeadNames(r)}</td>
@@ -451,7 +550,7 @@ export default function YourRequirementsScreen() {
                   <td>
                     <span className={`yr-status ${(r.status || 'ACTIVE').toLowerCase()}`}>{r.status || 'ACTIVE'}</span>
                   </td>
-                  <td>{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '—'}</td>
+                  <td>{formatDate(r.createdAt)}</td>
                   <td>
                     <div className="yr-actions" onClick={(e) => e.stopPropagation()}>
                       <button
@@ -509,7 +608,20 @@ export default function YourRequirementsScreen() {
         <div className="modal-overlay" onClick={closeRequirementDetails}>
           <div className="modal-card detail-modal pipeline-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-head">
-              <h3>Candidate pipeline — {viewingRequirement.publicId || viewingRequirement.id}</h3>
+              <div className="pipeline-modal-heading">
+                <h3>
+                  Candidate pipeline
+                  {(viewingRequirement.publicId || viewingRequirement.id) && (
+                    <span className="kpi-modal-count">{viewingRequirement.publicId || viewingRequirement.id}</span>
+                  )}
+                  <span className={`yr-status ${(viewingRequirement.status || 'ACTIVE').toLowerCase()}`}>
+                    {viewingRequirement.status || 'ACTIVE'}
+                  </span>
+                </h3>
+                <p className="pipeline-modal-sub">
+                  {[viewingRequirement.client?.name, viewingRequirement.roleSkill].filter(Boolean).join(' · ') || 'Pipeline'}
+                </p>
+              </div>
               <button className="modal-close" onClick={closeRequirementDetails} title="Close">×</button>
             </div>
             <div className="modal-body">
@@ -546,6 +658,12 @@ export default function YourRequirementsScreen() {
                 <div className="detail-item"><span className="detail-label">Onboarding</span><span className="detail-value">{viewingCandidate.onboarding?.statusCode || '—'}</span></div>
               </div>
               <div className="detail-description mt-sm">{viewingCandidate.remarks || 'No remarks.'}</div>
+              <CandidateResumeSection
+                candidateId={viewingCandidate.id || viewingCandidate.publicId}
+                initialHasResume={viewingCandidate.hasResume}
+                initialFileName={viewingCandidate.resumeFileName}
+                className="detail-item full mt-sm"
+              />
             </div>
             <div className="modal-foot">
               <button className="filter-clear" type="button" onClick={() => setViewingCandidate(null)}>Close</button>
@@ -750,6 +868,7 @@ export default function YourRequirementsScreen() {
                 </div>
                 {editError && <div className="add-error">{editError}</div>}
                 {editSuccess && <div className="add-success">{editSuccess}</div>}
+                {editing?.id && <RequirementNotes requirementId={editing.id} />}
               </div>
               <div className="modal-foot">
                 <button type="button" className="add-reset" onClick={closeEdit}>Cancel</button>

@@ -21,6 +21,7 @@ import { Role } from '../prisma/client';
 import { RequirementsService } from './requirements.service';
 import {
   CreateRequirementDto,
+  CreateRequirementNoteDto,
   RequirementStatusDto,
   UpdateRequirementDto,
 } from './dto/requirements.dto';
@@ -79,6 +80,37 @@ export class RequirementsController {
     @CurrentUser() user: AuthUser,
   ): Promise<any> {
     return this.requirements.getPipeline(id, user);
+  }
+
+  @Get(':id/notes')
+  @ApiOperation({
+    operationId: 'listRequirementNotes',
+    summary: 'Activity notes on a requirement',
+  })
+  @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
+  @ApiOkResponse({ description: 'Notes oldest first' })
+  @ApiProtectedErrors()
+  listNotes(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
+    return this.requirements.listNotes(id, user);
+  }
+
+  @Post(':id/notes')
+  @ApiOperation({
+    operationId: 'addRequirementNote',
+    summary: 'Add a note; notifies other owners on the requirement',
+  })
+  @ApiParam({ name: 'id', description: 'UUID or publicId (REQ-00001)' })
+  @ApiCreatedResponse({ description: 'Created note' })
+  @ApiMutateErrors()
+  addNote(
+    @Param('id') id: string,
+    @Body() dto: CreateRequirementNoteDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<any> {
+    return this.requirements.addNote(id, dto.body, user);
   }
 
   @Get(':id')

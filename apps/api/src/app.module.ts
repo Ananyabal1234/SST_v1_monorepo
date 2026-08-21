@@ -14,6 +14,8 @@ import { AuditModule } from './audit/audit.module';
 import { ImportModule } from './import/import.module';
 import { IdSequenceModule } from './id-sequence/id-sequence.module';
 import { MailModule } from './mail/mail.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { WorkModule } from './work/work.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { MailModule } from './mail/mail.module';
     DashboardModule,
     AuditModule,
     ImportModule,
+    NotificationsModule,
+    WorkModule,
   ],
 })
 export class AppModule {}

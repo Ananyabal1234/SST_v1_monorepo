@@ -419,6 +419,7 @@
 }
 
 .detail-item { display: flex; flex-direction: column; gap: 6px; }
+.detail-item.full { grid-column: 1 / -1; }
 
 .detail-value {
   display: inline-flex;

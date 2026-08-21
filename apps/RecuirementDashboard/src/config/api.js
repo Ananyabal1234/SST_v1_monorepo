@@ -52,12 +52,18 @@ export const ENDPOINTS = {
   CANDIDATE_DUPLICATES: '/api/v1/candidates/duplicates', // GET -> prior rows by email/mobile
   ADD_CANDIDATE: '/api/v1/candidates',  // POST -> add a candidate { requirementId, name, mobile, email, source, stageCode, candidateStatus, profileSubmittedDate, remarks }
   UPDATE_CANDIDATE: '/api/v1/candidates', // PATCH /api/v1/candidates/{id} -> edit a candidate
+  CANDIDATE_RESUME: '/api/v1/candidates', // POST/GET /api/v1/candidates/{id}/resume
+  TALENT_POOL: '/api/v1/candidates/talent-pool',
+  IMPORT_CANDIDATES: '/api/v1/candidates/import',
+  PARSE_RESUME: '/api/v1/candidates/parse-resume', // POST multipart resume -> { name, email, mobile, remarks, warnings }
 
   // ---- HR candidate pipeline ----
   HR_CANDIDATES: '/hr/candidates',      // GET  -> all candidates with their HR status
   UPDATE_HR_STATUS: '/hr/candidates',   // PUT  -> update a candidate's HR status
   OFFERS: '/api/v1/offers',             // GET list | POST create | GET/PUT /api/v1/offers/{id}
   ONBOARDINGS: '/api/v1/onboardings',   // GET list | POST create
+  NOTIFICATIONS: '/api/v1/notifications',
+  WORK_MINE: '/api/v1/work/mine',
 };
 
 // Standard request timeout (ms)

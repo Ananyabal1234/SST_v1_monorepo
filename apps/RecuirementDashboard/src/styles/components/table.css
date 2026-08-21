@@ -30,8 +30,7 @@
 
 .data-table,
 .cand-table,
-.mt-candidate-table,
-.duplicate-panel-table {
+.mt-candidate-table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-ui);

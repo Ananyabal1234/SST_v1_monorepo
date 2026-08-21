@@ -1,0 +1,2621 @@
+/* =============================================================
+   Role-screen UI/UX levels (additive, independently revertible)
+   -------------------------------------------------------------
+   HOW TO REVERT:
+   - Comment out one PHASE block between its START / END markers.
+   - Or remove this file import from global.css to revert all.
+   Scope: role screens + login + table/drawer/KPI extras.
+   Does not rename legacy classes.
+   ============================================================= */
+
+
+/* ===== PHASE 1: Role-screen chrome START =====
+   Match dashboard type, color, radius, spacing on role wrappers.
+   ===== */
+.add-request,
+.assign-task,
+.hr-candidates,
+.yr-screen,
+.my-tasks-screen,
+.my-work-screen,
+.users-screen,
+.login-page {
+  --font-ui: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --dash-text-hero: 1.375rem;
+  --dash-text-section: 0.9375rem;
+  --dash-text-nav: 0.8125rem;
+  --dash-text-meta: 0.75rem;
+  --dash-tracking-tight: -0.02em;
+  --dash-tracking-label: 0.02em;
+  --dash-accent: var(--color-primary-500);
+  --dash-accent-soft: color-mix(in srgb, var(--color-primary-500) 14%, transparent);
+  --dash-accent-border: color-mix(in srgb, var(--color-primary-500) 28%, var(--border));
+  font-family: var(--font-ui);
+  letter-spacing: -0.011em;
+}
+
+[data-theme='dark'] .add-request,
+[data-theme='dark'] .assign-task,
+[data-theme='dark'] .hr-candidates,
+[data-theme='dark'] .yr-screen,
+[data-theme='dark'] .my-tasks-screen,
+[data-theme='dark'] .my-work-screen,
+[data-theme='dark'] .users-screen {
+  --dash-card-bg: linear-gradient(160deg, #1a2730 0%, #152028 100%);
+  --dash-card-border: #2c4250;
+  --dash-text-strong: #f3f8fb;
+  --dash-text-body: #c5d5e0;
+  --dash-text-quiet: #8aa6b8;
+  --dash-hover: color-mix(in srgb, var(--color-primary-400) 12%, var(--surface));
+  --dash-accent-soft: color-mix(in srgb, var(--color-primary-500) 16%, var(--surface));
+}
+
+[data-theme='dark'] .login-page {
+  --dash-card-bg: linear-gradient(160deg, #17232c 0%, #121c24 100%);
+  --dash-card-border: #2c4250;
+  --dash-text-strong: #f3f8fb;
+  --dash-text-body: #c5d5e0;
+  --dash-text-quiet: #7e96a8;
+  --dash-hover: color-mix(in srgb, var(--color-primary-400) 12%, var(--surface));
+  --dash-accent-soft: color-mix(in srgb, var(--color-primary-500) 16%, var(--surface));
+}
+
+[data-theme='light'] .add-request,
+[data-theme='light'] .assign-task,
+[data-theme='light'] .hr-candidates,
+[data-theme='light'] .yr-screen,
+[data-theme='light'] .my-tasks-screen,
+[data-theme='light'] .my-work-screen,
+[data-theme='light'] .users-screen {
+  --dash-card-bg: #ffffff;
+  --dash-card-border: #d0e4f0;
+  --dash-text-strong: #0a2433;
+  --dash-text-body: #2f4d5e;
+  --dash-text-quiet: #5e7a8c;
+  --dash-hover: rgba(14, 165, 233, 0.08);
+}
+
+[data-theme='light'] .login-page {
+  --dash-card-bg: linear-gradient(160deg, #ffffff 0%, #f3f9fd 100%);
+  --dash-card-border: #d0e4f0;
+  --dash-text-strong: #0a2433;
+  --dash-text-body: #3d5a6c;
+  --dash-text-quiet: #6b8799;
+  --dash-hover: rgba(14, 165, 233, 0.08);
+}
+
+.add-request .page-header-title,
+.assign-task .assign-title,
+.hr-candidates .assign-title,
+.yr-screen .yr-title,
+.my-tasks-screen .assign-title,
+.users-screen .assign-title,
+.login-page .login-brand h1 {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: var(--dash-tracking-tight);
+  color: var(--dash-text-strong, var(--text));
+}
+
+.add-request .page-header-sub,
+.assign-task .assign-sub,
+.hr-candidates .assign-sub,
+.yr-screen .yr-sub,
+.my-tasks-screen .assign-sub,
+.users-screen .assign-sub {
+  font-size: var(--dash-text-nav);
+  font-weight: 500;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.add-request .add-label,
+.assign-task .cand-field span,
+.hr-candidates .detail-label,
+.yr-screen .filter-label,
+.hr-candidates .filter-label {
+  font-size: var(--dash-text-meta);
+  font-weight: 600;
+  letter-spacing: var(--dash-tracking-label);
+}
+
+.add-request-form,
+.assign-task .task-detail,
+.assign-task .task-card,
+.hr-candidates .filter-bar,
+.yr-screen .filter-bar,
+.users-screen .filter-bar,
+.my-task-card,
+.login-card {
+  border-color: var(--dash-card-border, var(--border));
+  border-radius: 14px;
+}
+
+.add-request-form,
+.assign-task .task-detail,
+.login-card {
+  background: var(--dash-card-bg, var(--surface));
+}
+
+.add-request .add-submit,
+.assign-task .add-submit,
+.assign-task .add-cand-btn,
+.hr-candidates .hr-detail-save,
+.yr-screen .hr-detail-save,
+.yr-screen .add-submit {
+  height: var(--control-height);
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.assign-task .add-cand-btn {
+  height: var(--control-height-sm);
+  padding: 0 12px;
+}
+
+.add-request .add-reset,
+.assign-task .add-reset,
+.yr-screen .add-reset,
+.assign-task .cand-edit,
+.hr-candidates .cand-edit,
+.yr-screen .cand-edit,
+.hr-candidates .hr-detail-btn {
+  border-radius: var(--radius-md);
+  font-family: var(--font-ui);
+  font-weight: 600;
+}
+
+.assign-task .cand-edit:hover,
+.hr-candidates .cand-edit:hover,
+.yr-screen .cand-edit:hover,
+.hr-candidates .hr-detail-btn:hover {
+  background: var(--dash-hover, var(--hover));
+  border-color: var(--dash-accent-border, var(--border));
+}
+
+.assign-task .task-card.active {
+  border-color: var(--dash-accent-border, var(--brand));
+  background: var(--dash-accent-soft, var(--brand-tint));
+}
+
+.assign-task .task-detail-title,
+.yr-screen .yr-count {
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: var(--dash-tracking-tight);
+}
+
+.cand-table thead th,
+.hr-table thead th,
+.yr-table thead th,
+.data-table thead th {
+  font-family: var(--font-ui);
+  font-size: var(--dash-text-meta, var(--text-ui));
+  font-weight: 600;
+  letter-spacing: var(--dash-tracking-label, 0.02em);
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.login-page .login-subtitle,
+.login-page .login-hint {
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.login-page .login-form label span {
+  font-size: var(--dash-text-meta);
+  letter-spacing: var(--dash-tracking-label);
+}
+/* ===== PHASE 1: Role-screen chrome END ===== */
+
+
+/* ===== PHASE 2: Empty / skeleton / toast START ===== */
+.screen-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0 var(--space-lg);
+}
+
+.toast-stack {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(380px, calc(100vw - 32px));
+}
+
+.toast {
+  pointer-events: auto;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-ui);
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border);
+  animation: toast-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.toast-success {
+  background: var(--rag-green-bg);
+  color: var(--rag-green-fg);
+  border-color: var(--success-task-border, var(--border));
+}
+
+.toast-error {
+  background: var(--rag-red-bg);
+  color: var(--rag-red-fg);
+}
+
+.toast-info {
+  background: var(--brand-tint);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 28%, var(--border));
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.table-search {
+  min-width: 220px;
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+
+.table-search input {
+  min-width: 0;
+  width: 100%;
+}
+/* ===== PHASE 2: Empty / skeleton / toast END ===== */
+
+
+/* ===== PHASE 3: Sticky first column START ===== */
+.cand-table th:first-child,
+.cand-table td:first-child,
+.hr-table th:first-child,
+.hr-table td:first-child,
+.yr-table th:first-child,
+.yr-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--surface);
+  box-shadow: 1px 0 0 var(--border);
+}
+
+.cand-table thead th:first-child,
+.hr-table thead th:first-child,
+.yr-table thead th:first-child {
+  z-index: 3;
+  background: var(--bg-soft);
+  top: 0;
+}
+
+.cand-table tbody tr:hover td:first-child,
+.hr-table tbody tr:hover td:first-child,
+.yr-table tbody tr:hover td:first-child,
+.data-table tbody tr:hover td:first-child {
+  background: var(--surface-2);
+}
+/* ===== PHASE 3: Sticky first column END ===== */
+
+
+/* ===== PHASE 4: Assign Task candidate form modal START ===== */
+.assign-task.cand-form-open .cand-form-overlay {
+  z-index: 120;
+}
+
+.assign-task .cand-form-modal {
+  width: min(780px, calc(100vw - 32px));
+  max-width: 94vw;
+  max-height: min(92vh, 880px);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
+.assign-task .cand-form-modal .cand-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+@media (max-width: 640px) {
+  .assign-task .cand-form-modal {
+    width: 100vw;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+
+  .assign-task .cand-form-modal .cand-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===== PHASE 4: Assign Task candidate form modal END ===== */
+
+
+/* ===== PHASE 6: KPI hierarchy + collapsible rail START ===== */
+.kpi-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.kpi-stack > .kpi-grid,
+.dashboard .kpi-stack > .kpi-grid {
+  margin-bottom: 0;
+}
+
+.kpi-grid-hero {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+}
+
+.kpi-grid-hero .kpi-card {
+  min-height: 120px;
+}
+
+.kpi-more {
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 14px;
+  background: var(--dash-card-bg, var(--surface));
+  padding: 8px 14px 14px;
+}
+
+.kpi-more > summary {
+  cursor: pointer;
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--dash-text-quiet, var(--text-soft));
+  padding: 8px 4px 12px;
+  list-style: none;
+}
+
+.kpi-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.kpi-more > summary::after {
+  content: '▾';
+  float: right;
+  opacity: 0.7;
+}
+
+.kpi-more:not([open]) > summary::after {
+  content: '▸';
+}
+
+.sidebar-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 10px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  background: transparent;
+  color: var(--dash-text-body, var(--text));
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sidebar-collapse-btn:hover {
+  background: var(--dash-hover, var(--hover));
+  color: var(--dash-text-strong, var(--text));
+}
+
+.sidebar-collapse-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.dashboard .sidebar.is-collapsed {
+  width: 72px;
+  flex-basis: 72px;
+  padding: 18px 8px;
+}
+
+.dashboard .sidebar.is-collapsed .sidebar-nav button {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  gap: 0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.dashboard .sidebar.is-collapsed .logout-btn,
+.dashboard .sidebar.is-collapsed .sidebar-collapse-btn {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.dashboard .sidebar.is-collapsed .sidebar-nav button span,
+.dashboard .sidebar.is-collapsed .user-meta,
+.dashboard .sidebar.is-collapsed .logout-btn span,
+.dashboard .sidebar.is-collapsed .sidebar-collapse-btn span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.dashboard .sidebar.is-collapsed .user-chip {
+  justify-content: center;
+}
+
+.dashboard .sidebar.is-collapsed .sidebar-nav button.active::before {
+  display: none;
+}
+/* ===== PHASE 6: KPI hierarchy + collapsible rail END ===== */
+
+
+/* ===== PHASE 7: Add Request fieldsets START ===== */
+.add-request-form .form-section {
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 12px;
+  padding: 16px 16px 8px;
+  margin: 0 0 16px;
+  min-width: 0;
+}
+
+.add-request-form .form-section legend {
+  font-family: var(--font-ui, inherit);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--dash-text-quiet, var(--text-soft));
+  padding: 0 6px;
+}
+
+.add-request-form .form-section .add-request-grid {
+  margin-top: 8px;
+}
+/* ===== PHASE 7: Add Request fieldsets END ===== */
+
+
+/* ===== PHASE 8: Login polish START ===== */
+.login-page {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+}
+
+.login-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: min(920px, 94vw);
+  background: var(--surface);
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 16px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.login-aside {
+  display: none;
+  padding: 40px 36px;
+  background:
+    radial-gradient(800px 400px at 0% 0%, color-mix(in srgb, var(--primary) 22%, transparent), transparent),
+    var(--brand-tint, var(--surface-2));
+  color: var(--text);
+}
+
+.login-aside h2 {
+  margin: 16px 0 8px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-aside p {
+  margin: 0;
+  color: var(--text-soft);
+  line-height: 1.5;
+  font-size: 0.9375rem;
+}
+
+.login-split .login-card {
+  width: auto;
+  max-width: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  padding: 40px 36px;
+  position: relative;
+}
+
+@media (min-width: 840px) {
+  .login-split {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .login-aside {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+}
+/* ===== PHASE 8: Login polish END ===== */
+
+
+/* ===== PHASE 10: Requirements tab polish START =====
+   Scoped to .yr-requirements so Assign Requirements (.yr-screen) is unchanged.
+   ===== */
+.yr-requirements .filter-bar-head {
+  width: 100%;
+}
+
+.yr-requirements .filter-bar-head .filter-clear {
+  margin-left: auto;
+}
+
+.yr-requirements .filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yr-requirements .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--dash-accent-border, var(--border));
+  border-radius: 999px;
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-text-strong, var(--text));
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.yr-requirements .filter-chip:hover {
+  border-color: var(--dash-accent, var(--primary));
+  color: var(--dash-accent, var(--primary));
+}
+
+.yr-requirements .filter-chip svg {
+  opacity: 0.7;
+}
+
+.yr-requirements .filter-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  align-items: end;
+  gap: 14px 16px;
+}
+
+.yr-requirements .filter-field select,
+.yr-requirements .filter-bar .table-search input {
+  height: 40px;
+  min-width: 0;
+  box-sizing: border-box;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease;
+}
+
+.yr-requirements .filter-field select:hover,
+.yr-requirements .filter-bar .table-search input:hover {
+  border-color: var(--dash-accent-border, var(--border));
+}
+
+.yr-requirements .filter-field select:focus,
+.yr-requirements .filter-bar .table-search input:focus {
+  border-color: var(--dash-accent, var(--primary));
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  outline: none;
+}
+
+.yr-requirements .filter-bar .table-toolbar {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.yr-requirements .filter-bar .table-search {
+  max-width: none;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.yr-requirements .yr-table-card {
+  border-radius: 14px;
+  border-color: var(--dash-card-border, var(--border));
+  background: var(--dash-card-bg, var(--surface));
+}
+
+.yr-requirements .yr-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.yr-requirements .yr-table thead th,
+.yr-requirements .yr-table tbody td {
+  padding: 8px 12px;
+}
+
+.yr-requirements .yr-table tbody td {
+  overflow: hidden;
+}
+
+.yr-requirements .yr-table thead th {
+  z-index: 4;
+  background: var(--bg-soft);
+}
+
+.yr-requirements .yr-table thead th:first-child {
+  z-index: 5;
+  background: var(--bg-soft);
+}
+
+.yr-requirements .yr-table tbody td:first-child {
+  z-index: 1;
+  background-clip: padding-box;
+}
+
+.yr-requirements .yr-table tbody tr:nth-child(even) td,
+.yr-requirements .yr-table tbody tr:nth-child(even) td:first-child {
+  background: color-mix(in srgb, var(--dash-text-quiet, var(--text-soft)) 6%, var(--surface));
+}
+
+.yr-requirements .yr-table tbody tr:nth-child(odd) td,
+.yr-requirements .yr-table tbody tr:nth-child(odd) td:first-child {
+  background: var(--surface);
+}
+
+.yr-requirements .yr-table tbody tr:hover td,
+.yr-requirements .yr-table tbody tr:hover td:first-child {
+  z-index: 1;
+  background: color-mix(in srgb, var(--dash-accent, var(--primary)) 12%, var(--surface));
+}
+
+.yr-requirements .yr-priority {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.yr-requirements .yr-priority.high {
+  color: var(--rag-amber-fg);
+  border-color: var(--rag-amber-bg);
+  background: var(--rag-amber-bg);
+}
+
+.yr-requirements .yr-priority.medium {
+  color: var(--dash-accent, var(--brand));
+  border-color: var(--dash-accent-border, var(--brand-tint));
+  background: var(--dash-accent-soft, var(--brand-tint));
+}
+
+.yr-requirements .yr-priority.low {
+  color: var(--dash-text-quiet, var(--text-muted));
+  border-color: var(--border);
+  background: var(--bg-soft);
+}
+
+.yr-requirements .yr-priority.critical {
+  color: var(--rag-red-fg);
+  border-color: var(--rag-red-bg);
+  background: var(--rag-red-bg);
+}
+
+.yr-requirements .yr-actions {
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.yr-requirements .yr-actions .cand-edit {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.yr-requirements .yr-actions .cand-edit svg {
+  width: 12px;
+  height: 12px;
+}
+
+@media (max-width: 720px) {
+  .yr-requirements .filter-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .yr-requirements .yr-actions {
+    flex-wrap: wrap;
+  }
+}
+/* ===== PHASE 10: Requirements tab polish END ===== */
+
+
+/* ===== PHASE 11: Pipeline modal + kanban START =====
+   Modal chrome and denser board inside .pipeline-modal.
+   Shared loading/empty helpers stay usable on other pipeline views.
+   ===== */
+.pipeline-skel {
+  height: 56px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    var(--bg-soft) 0%,
+    color-mix(in srgb, var(--dash-accent, var(--primary)) 10%, var(--bg-soft)) 50%,
+    var(--bg-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: pipeline-skel-shift 1.2s ease-in-out infinite;
+}
+
+.pipeline-skel--short {
+  height: 40px;
+  width: 72%;
+}
+
+@keyframes pipeline-skel-shift {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipeline-skel { animation: none; }
+}
+
+.pipeline-board-empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--dash-card-border, var(--border));
+  border-radius: 10px;
+  color: var(--dash-text-quiet, var(--text-soft));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  background: color-mix(in srgb, var(--bg-soft) 70%, transparent);
+}
+
+.modal-overlay:has(.pipeline-modal) {
+  backdrop-filter: blur(8px);
+  background: color-mix(in srgb, var(--overlay, rgba(8, 18, 28, 0.55)) 88%, #000);
+}
+
+.modal-card.pipeline-modal {
+  background: var(--surface);
+  border-color: var(--dash-card-border, var(--border));
+}
+
+.pipeline-modal .modal-head {
+  align-items: flex-start;
+  gap: 12px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+}
+
+.pipeline-modal-heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.pipeline-modal .modal-head h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pipeline-modal-sub {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.pipeline-modal .modal-body {
+  padding: 16px 18px 18px;
+}
+
+.pipeline-modal .pipeline-board {
+  gap: 16px;
+}
+
+.pipeline-modal .pipeline-board-head {
+  padding: 12px 14px;
+  border-color: var(--dash-card-border, var(--border));
+  border-radius: 12px;
+}
+
+.pipeline-modal .pipeline-board-title-row {
+  display: none;
+}
+
+.pipeline-modal .pipeline-count-chips {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.pipeline-modal .pipeline-columns {
+  gap: 14px;
+  min-height: 360px;
+}
+
+.pipeline-modal .pipeline-column {
+  flex: 0 0 240px;
+  min-height: 320px;
+  max-height: min(62vh, 560px);
+  border-radius: 14px;
+  border-color: var(--dash-card-border, var(--border));
+  background: color-mix(in srgb, var(--bg-soft) 80%, var(--surface));
+}
+
+.pipeline-modal .pipeline-column-head {
+  padding: 12px 14px;
+  border-bottom-color: var(--dash-card-border, var(--border));
+  box-shadow: inset 0 3px 0 var(--dash-accent, var(--primary));
+  background: var(--surface);
+}
+
+.pipeline-modal .pipeline-column--joined .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-green-fg, #22c55e);
+}
+
+.pipeline-modal .pipeline-column--hold .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-amber-fg, #f59e0b);
+}
+
+.pipeline-modal .pipeline-column--reject .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-red-fg, #ef4444);
+}
+
+.pipeline-modal .pipeline-empty {
+  margin: 4px 0;
+  padding: 16px 10px;
+  text-align: center;
+  border: 1px dashed var(--dash-card-border, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-soft) 55%, transparent);
+}
+
+.pipeline-modal .pipeline-card {
+  border-radius: 12px;
+  border-color: var(--dash-card-border, var(--border));
+  padding: 12px 12px 10px;
+}
+
+.pipeline-modal .pipeline-card-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--dash-text-strong, var(--text));
+}
+
+.pipeline-modal .pipeline-card-id {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--dash-accent, var(--brand));
+}
+
+.pipeline-modal .pipeline-card-meta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-text-body, var(--text-soft));
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.pipeline-modal .pipeline-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--dash-accent, var(--primary));
+}
+
+.pipeline-modal .pipeline-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  border-color: var(--dash-accent, var(--primary));
+}
+/* ===== PHASE 11: Pipeline modal + kanban END ===== */
+
+
+/* ===== PHASE 12: Assign Task polish START =====
+   Scoped to .assign-task so Requirements / Assign Requirements stay unchanged.
+   ===== */
+.assign-task .assign-body {
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-height: calc(100vh - 168px);
+}
+
+.assign-task .task-list,
+.assign-task .task-detail {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: calc(100vh - 168px);
+  overflow: hidden;
+  background: var(--dash-card-bg, var(--surface));
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.assign-task .task-list {
+  position: static;
+  max-height: none;
+  padding: 0;
+  gap: 0;
+}
+
+.assign-task .task-list-toolbar {
+  position: static;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  border-bottom: 1px solid var(--dash-card-border, var(--border));
+}
+
+.assign-task .task-list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.assign-task .task-list-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assign-task .task-list-title {
+  margin: 0;
+}
+
+.assign-task .task-detail > .empty-state {
+  margin: auto;
+  padding: 32px 16px;
+}
+
+.assign-task .task-list-head .yr-count {
+  margin-left: 0;
+}
+
+.assign-task .at-task-search {
+  display: block;
+}
+
+.assign-task .at-task-search input {
+  height: 36px;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  padding: 0 12px;
+}
+
+.assign-task .at-task-search input:focus {
+  border-color: var(--dash-accent, var(--primary));
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  outline: none;
+}
+
+.assign-task .task-card {
+  padding: 10px 12px;
+  gap: 4px;
+  border-color: var(--dash-card-border, var(--border));
+  border-radius: 12px;
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.assign-task .task-card:hover {
+  border-color: var(--dash-accent-border, var(--brand));
+  transform: translateY(-1px);
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.assign-task .task-card.active {
+  border-color: var(--dash-accent-border, var(--brand));
+  background: color-mix(in srgb, var(--dash-accent, #0ea5e9) 12%, var(--surface));
+  box-shadow: inset 3px 0 0 #0ea5e9;
+}
+
+.assign-task .task-card--completed {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 8%, var(--surface));
+}
+
+.assign-task .task-card--completed.active {
+  background: color-mix(in srgb, var(--dash-accent, #0ea5e9) 12%, var(--surface));
+  border-color: var(--dash-accent-border, var(--brand));
+  box-shadow: inset 3px 0 0 #0ea5e9;
+}
+
+.assign-task .task-card-top,
+.assign-task .task-client,
+.assign-task .task-pos {
+  min-width: 0;
+}
+
+.assign-task .task-client,
+.assign-task .task-pos,
+.assign-task .task-card-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assign-task .task-card-id {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--dash-accent, var(--brand));
+}
+
+.assign-task .task-card-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.assign-task .task-card-foot .yr-status {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  font-size: 0.625rem;
+}
+
+.assign-task .task-card-quiet {
+  flex: 0 0 auto;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--dash-text-quiet, var(--text-soft));
+  white-space: nowrap;
+}
+
+.assign-task .task-detail {
+  padding: 0;
+}
+
+.assign-task .task-detail-head {
+  flex: 0 0 auto;
+  align-items: flex-start;
+  margin: 0;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--primary) 6%, var(--surface));
+  border-bottom: 1px solid var(--dash-card-border, var(--border));
+}
+
+.assign-task .task-detail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 16px;
+}
+
+.assign-task .task-detail-body .pipeline-board {
+  min-height: 100%;
+}
+
+.assign-task .task-detail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.assign-task .task-detail-pos {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .at-view-toggle {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+
+.assign-task .at-view-toggle button {
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--dash-text-quiet, var(--text-soft));
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.assign-task .at-view-toggle button.active {
+  background: var(--surface);
+  color: var(--dash-accent, var(--primary));
+  box-shadow: var(--shadow-sm);
+}
+
+.assign-task .pipeline-board-title-row,
+.assign-task .pipeline-board .pipeline-recruiting-paused {
+  display: none;
+}
+
+.assign-task .pipeline-board {
+  gap: 16px;
+}
+
+.assign-task .pipeline-board-head {
+  padding: 0 0 12px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+}
+
+.assign-task .pipeline-count-chips {
+  margin-top: 0;
+  gap: 8px;
+}
+
+.assign-task .pipeline-columns {
+  gap: 14px;
+  min-height: 360px;
+}
+
+.assign-task .pipeline-column {
+  flex: 0 0 240px;
+  min-height: 320px;
+  max-height: min(62vh, 560px);
+  border-radius: 14px;
+  border-color: var(--dash-card-border, var(--border));
+  background: color-mix(in srgb, var(--bg-soft) 80%, var(--surface));
+}
+
+.assign-task .pipeline-column-head {
+  padding: 12px 14px;
+  border-bottom-color: var(--dash-card-border, var(--border));
+  box-shadow: inset 0 3px 0 var(--dash-accent, var(--primary));
+  background: var(--surface);
+}
+
+.assign-task .pipeline-column--joined .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-green-fg, #22c55e);
+}
+
+.assign-task .pipeline-column--hold .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-amber-fg, #f59e0b);
+}
+
+.assign-task .pipeline-column--reject .pipeline-column-head {
+  box-shadow: inset 0 3px 0 var(--rag-red-fg, #ef4444);
+}
+
+.assign-task .pipeline-empty {
+  margin: 4px 0;
+  padding: 16px 10px;
+  text-align: center;
+  border: 1px dashed var(--dash-card-border, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-soft) 55%, transparent);
+}
+
+.assign-task .pipeline-card {
+  border-radius: 12px;
+  border-color: var(--dash-card-border, var(--border));
+  padding: 12px 12px 10px;
+}
+
+.assign-task .pipeline-card-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--dash-text-strong, var(--text));
+}
+
+.assign-task .pipeline-card-id {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--dash-accent, var(--brand));
+}
+
+.assign-task .pipeline-card-meta {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-text-body, var(--text-soft));
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.assign-task .pipeline-card:hover {
+  transform: translateY(-1px);
+  border-color: var(--dash-accent, var(--primary));
+}
+
+.assign-task .pipeline-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  border-color: var(--dash-accent, var(--primary));
+}
+
+.assign-task .cand-table-wrap {
+  border-radius: 12px;
+  border-color: var(--dash-card-border, var(--border));
+  box-shadow: none;
+}
+
+.assign-task .cand-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.assign-task .cand-table thead th,
+.assign-task .cand-table tbody td {
+  padding: 8px 12px;
+}
+
+.assign-task .cand-table tbody td {
+  overflow: hidden;
+}
+
+.assign-task .cand-table thead th {
+  z-index: 4;
+  background: var(--bg-soft);
+}
+
+.assign-task .cand-table thead th:first-child {
+  z-index: 5;
+  background: var(--bg-soft);
+}
+
+.assign-task .cand-table tbody td:first-child {
+  z-index: 1;
+  background-clip: padding-box;
+}
+
+.assign-task .cand-table tbody tr:nth-child(even) td,
+.assign-task .cand-table tbody tr:nth-child(even) td:first-child {
+  background: color-mix(in srgb, var(--dash-text-quiet, var(--text-soft)) 6%, var(--surface));
+}
+
+.assign-task .cand-table tbody tr:nth-child(odd) td,
+.assign-task .cand-table tbody tr:nth-child(odd) td:first-child {
+  background: var(--surface);
+}
+
+.assign-task .cand-table tbody tr:hover td,
+.assign-task .cand-table tbody tr:hover td:first-child {
+  z-index: 1;
+  background: color-mix(in srgb, var(--dash-accent, var(--primary)) 12%, var(--surface));
+}
+
+.assign-task .at-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .at-stage {
+  color: var(--dash-accent, var(--brand));
+  border-color: var(--dash-accent-border, var(--brand-tint));
+  background: var(--dash-accent-soft, var(--brand-tint));
+}
+
+.assign-task .at-status.selected,
+.assign-task .at-status.joined {
+  color: var(--rag-green-fg);
+  border-color: var(--rag-green-bg);
+  background: var(--rag-green-bg);
+}
+
+.assign-task .at-status.pending,
+.assign-task .at-status.hold {
+  color: var(--rag-amber-fg);
+  border-color: var(--rag-amber-bg);
+  background: var(--rag-amber-bg);
+}
+
+.assign-task .at-status.reject,
+.assign-task .at-status.rejected {
+  color: var(--rag-red-fg);
+  border-color: var(--rag-red-bg);
+  background: var(--rag-red-bg);
+}
+
+.assign-task .cand-table .cand-edit {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.assign-task .cand-table .cand-edit svg {
+  width: 12px;
+  height: 12px;
+}
+
+.assign-task .detail-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.assign-task.cand-form-open .cand-form-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+}
+
+.assign-task .cand-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex: 0 0 auto;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--dash-card-border, var(--border));
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+}
+
+.assign-task .cand-form-heading {
+  min-width: 0;
+}
+
+.assign-task .cand-form-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.assign-task .cand-form-sub {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dash-text-quiet, var(--text-soft));
+  line-height: 1.4;
+}
+
+.assign-task .cand-form-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px 20px;
+}
+
+.assign-task .cand-form-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.assign-task .cand-form-chip {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 10px;
+  background: var(--bg-soft);
+}
+
+.assign-task .cand-form-chip-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .cand-form-chip-value {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assign-task .cand-resume-block {
+  margin-bottom: 14px;
+}
+
+.assign-task .cand-resume-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.assign-task .cand-resume-drop {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 18px 16px;
+  border: 1.5px dashed var(--dash-card-border, var(--border));
+  border-radius: 12px;
+  background: var(--bg-soft);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  transition: border-color var(--duration-fast), background var(--duration-fast);
+}
+
+.assign-task .cand-resume-drop svg {
+  width: 22px;
+  height: 22px;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+
+.assign-task .cand-resume-drop strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.assign-task .cand-resume-drop span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--dash-text-quiet, var(--text-soft));
+  max-width: 420px;
+}
+
+.assign-task .cand-resume-drop:hover:not(:disabled),
+.assign-task .cand-resume-drop.is-drag {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+}
+
+.assign-task .cand-resume-drop.has-file {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+
+.assign-task .cand-resume-drop.is-busy,
+.assign-task .cand-resume-drop:disabled {
+  opacity: 0.75;
+  cursor: wait;
+}
+
+.assign-task .cand-resume-block .resume-file-meta {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.assign-task .cand-resume-block .filter-clear {
+  margin-left: 0;
+}
+
+.assign-task .cand-form-section {
+  margin: 0 0 14px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.assign-task .cand-form-section legend {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: var(--text);
+  padding: 0 6px;
+}
+
+.assign-task .cand-form-section-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .cand-form-foot {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--dash-card-border, var(--border));
+  background: var(--bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.assign-task .cand-form-foot-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .cand-form-foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  .assign-task .cand-form-context {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .assign-task .cand-form-context {
+    grid-template-columns: 1fr;
+  }
+
+  .assign-task .cand-form-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .assign-task .cand-form-foot-actions {
+    margin-left: 0;
+  }
+
+  .assign-task .cand-form-foot-actions .add-submit,
+  .assign-task .cand-form-foot-actions .add-reset {
+    flex: 1;
+  }
+}
+
+@media (max-width: 900px) {
+  .assign-task .assign-body {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .assign-task .task-list,
+  .assign-task .task-detail {
+    height: auto;
+    max-height: none;
+  }
+
+  .assign-task .task-list {
+    max-height: min(42vh, 360px);
+  }
+}
+/* ===== PHASE 12: Assign Task polish END ===== */
+
+
+/* ===== PHASE 13: Offer + Onboarding lists START =====
+   Scoped to .hr-candidates (Offers and Onboarding screens).
+   ===== */
+.hr-candidates .assign-head .yr-count {
+  margin-left: auto;
+}
+
+.hr-candidates .filter-bar-head {
+  width: 100%;
+}
+
+.hr-candidates .filter-bar-head .filter-clear {
+  margin-left: auto;
+}
+
+.hr-candidates .filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hr-candidates .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--dash-accent-border, var(--border));
+  border-radius: 999px;
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-text-strong, var(--text));
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hr-candidates .filter-chip:hover {
+  border-color: var(--dash-accent, var(--primary));
+  color: var(--dash-accent, var(--primary));
+}
+
+.hr-candidates .filter-field select,
+.hr-candidates .filter-bar .table-search input {
+  height: 40px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.hr-candidates .filter-field select:focus,
+.hr-candidates .filter-bar .table-search input:focus {
+  border-color: var(--dash-accent, var(--primary));
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  outline: none;
+}
+
+.hr-candidates .filter-bar .table-toolbar {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.hr-candidates .filter-bar .table-search {
+  max-width: none;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.hr-candidates .filter-bar .hr-chips {
+  margin-bottom: 0;
+}
+
+.hr-candidates .hr-chip {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border-color: var(--dash-card-border, var(--border));
+}
+
+.hr-candidates .hr-chip.active {
+  border-color: var(--dash-accent, var(--primary));
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-accent, var(--primary));
+}
+
+.hr-candidates .cand-table-wrap {
+  border-radius: 14px;
+  border-color: var(--dash-card-border, var(--border));
+  background: var(--dash-card-bg, var(--surface));
+}
+
+.hr-candidates .hr-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.hr-candidates .hr-table thead th,
+.hr-candidates .hr-table tbody td {
+  padding: 8px 12px;
+}
+
+.hr-candidates .hr-table tbody td {
+  overflow: hidden;
+}
+
+.hr-candidates .hr-table thead th {
+  z-index: 4;
+  background: var(--bg-soft);
+}
+
+.hr-candidates .hr-table thead th:first-child {
+  z-index: 5;
+  background: var(--bg-soft);
+}
+
+.hr-candidates .hr-table tbody td:first-child {
+  z-index: 1;
+  background-clip: padding-box;
+}
+
+.hr-candidates .hr-table tbody tr:nth-child(even) td,
+.hr-candidates .hr-table tbody tr:nth-child(even) td:first-child {
+  background: color-mix(in srgb, var(--dash-text-quiet, var(--text-soft)) 6%, var(--surface));
+}
+
+.hr-candidates .hr-table tbody tr:nth-child(odd) td,
+.hr-candidates .hr-table tbody tr:nth-child(odd) td:first-child {
+  background: var(--surface);
+}
+
+.hr-candidates .hr-table tbody tr:hover td,
+.hr-candidates .hr-table tbody tr:hover td:first-child {
+  z-index: 1;
+  background: color-mix(in srgb, var(--dash-accent, var(--primary)) 12%, var(--surface));
+}
+
+.hr-pill,
+.hr-candidates .hr-status-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--dash-text-quiet, var(--text-soft));
+  white-space: nowrap;
+}
+
+.hr-pill-status.released,
+.hr-pill-status.accepted,
+.hr-pill-bgv.cleared,
+.hr-status-label.st-joined,
+.hr-status-label.st-selected {
+  color: var(--rag-green-fg);
+  border-color: var(--rag-green-bg);
+  background: var(--rag-green-bg);
+}
+
+.hr-pill-status.hold,
+.hr-pill-status.initiated,
+.hr-pill-bgv.in_progress,
+.hr-pill-bgv.not_started,
+.hr-status-label.st-pending,
+.hr-status-label.st-pipeline {
+  color: var(--rag-amber-fg);
+  border-color: var(--rag-amber-bg);
+  background: var(--rag-amber-bg);
+}
+
+.hr-pill-status.declined,
+.hr-pill-status.backout,
+.hr-pill-bgv.failed,
+.hr-status-label.st-rejected {
+  color: var(--rag-red-fg);
+  border-color: var(--rag-red-bg);
+  background: var(--rag-red-bg);
+}
+
+.hr-pill-req.active {
+  color: var(--rag-green-fg);
+  border-color: var(--rag-green-bg);
+  background: var(--rag-green-bg);
+}
+
+.hr-pill-req.on_hold {
+  color: var(--rag-amber-fg);
+  border-color: var(--rag-amber-bg);
+  background: var(--rag-amber-bg);
+}
+
+.hr-pill-req.cancelled,
+.hr-pill-req.closed {
+  color: var(--rag-red-fg);
+  border-color: var(--rag-red-bg);
+  background: var(--rag-red-bg);
+}
+
+.hr-candidates .hr-detail-btn {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  white-space: nowrap;
+}
+
+.hr-candidates .hr-detail-btn svg {
+  width: 12px;
+  height: 12px;
+}
+/* ===== PHASE 13: Offer + Onboarding lists END ===== */
+
+
+/* ===== PHASE 14: Users tab START ===== */
+.users-screen .assign-head .yr-count {
+  margin-left: auto;
+}
+
+.users-screen .filter-bar-head {
+  width: 100%;
+}
+
+.users-screen .filter-bar-head .filter-clear {
+  margin-left: auto;
+}
+
+.users-screen .filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.users-screen .filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid var(--dash-accent-border, var(--border));
+  border-radius: 999px;
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-text-strong, var(--text));
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.users-screen .filter-chip:hover {
+  border-color: var(--dash-accent, var(--primary));
+  color: var(--dash-accent, var(--primary));
+}
+
+.users-screen .filter-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, 1fr));
+  gap: 14px 16px;
+}
+
+.users-screen .filter-field select,
+.users-screen .filter-bar .table-search input {
+  height: 40px;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.users-screen .filter-field select:focus,
+.users-screen .filter-bar .table-search input:focus {
+  border-color: var(--dash-accent, var(--primary));
+  box-shadow: 0 0 0 3px var(--dash-accent-soft, var(--brand-tint));
+  outline: none;
+}
+
+.users-screen .filter-bar .table-toolbar {
+  margin-bottom: 0;
+  width: 100%;
+}
+
+.users-screen .filter-bar .table-search {
+  max-width: none;
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.users-screen .users-table-card {
+  border-radius: 14px;
+  border-color: var(--dash-card-border, var(--border));
+  background: var(--dash-card-bg, var(--surface));
+}
+
+.users-screen .users-table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.users-screen .users-table thead th,
+.users-screen .users-table tbody td {
+  padding: 8px 12px;
+}
+
+.users-screen .users-table tbody td {
+  overflow: hidden;
+}
+
+.users-screen .users-table thead th {
+  z-index: 4;
+  background: var(--bg-soft);
+}
+
+.users-screen .users-table thead th:first-child {
+  z-index: 5;
+  background: var(--bg-soft);
+}
+
+.users-screen .users-table tbody td:first-child {
+  z-index: 1;
+  background-clip: padding-box;
+}
+
+.users-screen .users-table tbody tr:nth-child(even) td,
+.users-screen .users-table tbody tr:nth-child(even) td:first-child {
+  background: color-mix(in srgb, var(--dash-text-quiet, var(--text-soft)) 6%, var(--surface));
+}
+
+.users-screen .users-table tbody tr:nth-child(odd) td,
+.users-screen .users-table tbody tr:nth-child(odd) td:first-child {
+  background: var(--surface);
+}
+
+.users-screen .users-table tbody tr:hover td,
+.users-screen .users-table tbody tr:hover td:first-child {
+  z-index: 1;
+  background: color-mix(in srgb, var(--dash-accent, var(--primary)) 12%, var(--surface));
+}
+
+.users-you {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: var(--dash-accent-soft, var(--brand-tint));
+  color: var(--dash-accent, var(--primary));
+  vertical-align: middle;
+}
+
+.users-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg-soft);
+  color: var(--dash-text-quiet, var(--text-soft));
+  white-space: nowrap;
+}
+
+.users-pill-role {
+  color: var(--dash-accent, var(--brand));
+  border-color: var(--dash-accent-border, var(--brand-tint));
+  background: var(--dash-accent-soft, var(--brand-tint));
+}
+
+.users-pill-status.active {
+  color: var(--rag-green-fg);
+  border-color: var(--rag-green-bg);
+  background: var(--rag-green-bg);
+}
+
+.users-pill-status.inactive {
+  color: var(--dash-text-quiet, var(--text-muted));
+}
+
+.users-screen .users-row-actions .cand-edit,
+.users-screen .users-row-actions .users-delete-btn {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 0.6875rem;
+  margin-left: 0;
+}
+
+.users-screen .users-row-actions .cand-edit svg {
+  width: 12px;
+  height: 12px;
+}
+
+.users-screen .users-pager {
+  margin-top: 12px;
+}
+
+.users-create {
+  margin-top: 20px;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 14px;
+  background: var(--dash-card-bg, var(--surface));
+}
+
+.users-create-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--dash-text-strong, var(--text));
+}
+
+.users-create-head p {
+  margin: 4px 0 0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.users-create-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+  margin-top: 16px;
+}
+
+.users-create-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.users-screen .modal-head {
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+}
+
+@media (max-width: 720px) {
+  .users-screen .filter-fields,
+  .users-create-grid {
+    grid-template-columns: 1fr;
+  }
+}
+/* ===== PHASE 14: Users tab END ===== */
+
+
+/* ===== PHASE 15: Dark theme surfaces START =====
+   Opaque fields, headers, chips, and autofill for dark only.
+   Does not restyle Assign Requirements beyond shared table/input chrome.
+   ===== */
+[data-theme='dark'] ::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+[data-theme='dark'] .field-control,
+[data-theme='dark'] .add-field input,
+[data-theme='dark'] .add-field select,
+[data-theme='dark'] .add-field textarea,
+[data-theme='dark'] .detail-field input,
+[data-theme='dark'] .detail-field select,
+[data-theme='dark'] .detail-field textarea,
+[data-theme='dark'] .cand-field input,
+[data-theme='dark'] .cand-field select,
+[data-theme='dark'] .cand-field textarea,
+[data-theme='dark'] .filter-field select,
+[data-theme='dark'] .filter-field input[type='date'],
+[data-theme='dark'] .filter-field input[type='text'],
+[data-theme='dark'] .hr-status-select,
+[data-theme='dark'] .ta-multi-trigger,
+[data-theme='dark'] .table-search input,
+[data-theme='dark'] .assign-task .at-task-search input {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+[data-theme='dark'] input:-webkit-autofill,
+[data-theme='dark'] input:-webkit-autofill:hover,
+[data-theme='dark'] input:-webkit-autofill:focus,
+[data-theme='dark'] textarea:-webkit-autofill,
+[data-theme='dark'] select:-webkit-autofill {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--surface-2) inset;
+  transition: background-color 99999s ease-out;
+}
+
+[data-theme='dark'] .data-table thead th,
+[data-theme='dark'] .cand-table thead th,
+[data-theme='dark'] .hr-table thead th,
+[data-theme='dark'] .yr-table thead th,
+[data-theme='dark'] .mt-candidate-table thead th,
+[data-theme='dark'] .users-screen .users-table thead th,
+[data-theme='dark'] .modal-head {
+  background: var(--surface-2);
+}
+
+[data-theme='dark'] .yr-requirements .yr-table thead th,
+[data-theme='dark'] .yr-requirements .yr-table thead th:first-child,
+[data-theme='dark'] .hr-candidates .hr-table thead th,
+[data-theme='dark'] .hr-candidates .hr-table thead th:first-child,
+[data-theme='dark'] .users-screen .users-table thead th,
+[data-theme='dark'] .users-screen .users-table thead th:first-child,
+[data-theme='dark'] .assign-task .cand-table thead th,
+[data-theme='dark'] .assign-task .cand-table thead th:first-child {
+  background: var(--surface-2);
+}
+
+[data-theme='dark'] .yr-requirements .yr-table tbody tr:nth-child(even) td,
+[data-theme='dark'] .yr-requirements .yr-table tbody tr:nth-child(even) td:first-child,
+[data-theme='dark'] .hr-candidates .hr-table tbody tr:nth-child(even) td,
+[data-theme='dark'] .hr-candidates .hr-table tbody tr:nth-child(even) td:first-child,
+[data-theme='dark'] .users-screen .users-table tbody tr:nth-child(even) td,
+[data-theme='dark'] .users-screen .users-table tbody tr:nth-child(even) td:first-child,
+[data-theme='dark'] .assign-task .cand-table tbody tr:nth-child(even) td,
+[data-theme='dark'] .assign-task .cand-table tbody tr:nth-child(even) td:first-child {
+  background: color-mix(in srgb, var(--dash-text-quiet, var(--text-soft)) 10%, var(--surface));
+}
+
+[data-theme='dark'] .yr-requirements .yr-table tbody tr:hover td,
+[data-theme='dark'] .yr-requirements .yr-table tbody tr:hover td:first-child,
+[data-theme='dark'] .hr-candidates .hr-table tbody tr:hover td,
+[data-theme='dark'] .hr-candidates .hr-table tbody tr:hover td:first-child,
+[data-theme='dark'] .users-screen .users-table tbody tr:hover td,
+[data-theme='dark'] .users-screen .users-table tbody tr:hover td:first-child,
+[data-theme='dark'] .assign-task .cand-table tbody tr:hover td,
+[data-theme='dark'] .assign-task .cand-table tbody tr:hover td:first-child {
+  z-index: 1;
+  background: color-mix(in srgb, var(--dash-accent, var(--primary)) 12%, var(--surface));
+}
+
+[data-theme='dark'] .yr-requirements .filter-chip,
+[data-theme='dark'] .hr-candidates .filter-chip,
+[data-theme='dark'] .users-screen .filter-chip {
+  border-color: color-mix(in srgb, var(--dash-accent, var(--primary)) 40%, var(--dash-card-border, var(--border)));
+}
+
+[data-theme='dark'] .yr-requirements .filter-chip:hover,
+[data-theme='dark'] .hr-candidates .filter-chip:hover,
+[data-theme='dark'] .users-screen .filter-chip:hover {
+  background: var(--dash-hover);
+  border-color: var(--dash-accent, var(--primary));
+}
+
+[data-theme='dark'] .hr-candidates .hr-chip.active {
+  background: var(--primary);
+  color: var(--text-on-primary);
+  border-color: var(--primary);
+}
+
+[data-theme='dark'] .hr-chip.active em {
+  background: color-mix(in srgb, #fff 22%, transparent);
+  color: #fff;
+}
+
+[data-theme='dark'] .btn-ghost:hover:not(:disabled) {
+  background: var(--brand-tint);
+}
+
+[data-theme='dark'] .btn-secondary:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+[data-theme='dark'] .users-screen .modal-head {
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface-2));
+}
+
+[data-theme='dark'] .login-page .login-aside {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--primary) 14%, var(--surface)) 0%, var(--surface) 48%);
+}
+
+[data-theme='dark'] .login-page .login-form input {
+  background: var(--bg);
+  color: var(--text);
+}
+
+[data-theme='dark'] .login-page input:-webkit-autofill,
+[data-theme='dark'] .login-page input:-webkit-autofill:hover,
+[data-theme='dark'] .login-page input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  box-shadow: 0 0 0 1000px var(--bg) inset;
+}
+/* ===== PHASE 15: Dark theme surfaces END ===== */
+
+/* Hidden unless PHASE 16 is enabled — commenting PHASE 16 removes pulse columns only. */
+.yr-requirements .yr-pulse-col {
+  display: none;
+}
+
+/* ===== PHASE 16: Sales pipeline pulse START =====
+   Compact Fill / Pipeline / RAG on Requirements (.yr-requirements) only.
+   Comment out this block to hide the three columns.
+   ===== */
+.yr-requirements .yr-pulse-col {
+  display: table-cell;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.yr-rag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.yr-rag--green {
+  background: var(--rag-green-bg, #dcfce7);
+  color: var(--rag-green-fg, #166534);
+}
+
+.yr-rag--amber {
+  background: var(--rag-amber-bg, #fef3c7);
+  color: var(--rag-amber-fg, #92400e);
+}
+
+.yr-rag--red {
+  background: var(--rag-red-bg, #fee2e2);
+  color: var(--rag-red-fg, #991b1b);
+}
+
+.yr-rag--none {
+  color: var(--text-soft);
+}
+/* ===== PHASE 16: Sales pipeline pulse END ===== */
+
+/* ===== PHASE 17: TA sourcing panel START =====
+   Comment out this block to drop sourcing chrome; Search/Import still work.
+   ===== */
+.assign-task .sourcing-panel {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.assign-task .assign-head .add-cand-btn {
+  margin-left: auto;
+}
+
+.assign-task .sourcing-modal {
+  max-width: 720px;
+  width: min(720px, 94vw);
+}
+
+.assign-task .sourcing-modal .modal-head {
+  align-items: flex-start;
+  gap: 12px;
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-soft));
+}
+
+.assign-task .sourcing-modal .modal-head h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.assign-task .sourcing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.assign-task .sourcing-section .field-control {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.assign-task .sourcing-hint {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-soft);
+}
+
+.assign-task .sourcing-tabs {
+  margin: 0;
+}
+
+.assign-task .sourcing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assign-task .sourcing-actions a.cand-edit {
+  text-decoration: none;
+}
+
+.assign-task .sourcing-talent-form,
+.assign-task .sourcing-csv-form,
+.assign-task .sourcing-paste-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assign-task .sourcing-talent-form {
+  flex-direction: row;
+  align-items: flex-end;
+}
+
+.assign-task .sourcing-talent-form .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.assign-task .sourcing-talent-form .add-submit {
+  flex: 0 0 auto;
+}
+
+.assign-task .sourcing-paste-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.assign-task .sourcing-talent-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.assign-task .sourcing-talent-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--dash-card-border, var(--border));
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.assign-task .sourcing-talent-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.assign-task .sourcing-talent-main strong {
+  font-size: 0.875rem;
+}
+
+.assign-task .sourcing-talent-meta,
+.assign-task .sourcing-talent-tags em {
+  font-size: 0.75rem;
+  color: var(--text-soft);
+  font-style: normal;
+}
+
+.assign-task .sourcing-talent-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.assign-task .sourcing-csv-form .cand-form-section,
+.assign-task .sourcing-paste-form .cand-form-section {
+  margin-bottom: 0;
+}
+/* ===== PHASE 17: TA sourcing panel END ===== */
+
+
+
+/* ===== PHASE 18: Assign Task card grid + pipeline modal START =====
+   Overrides PHASE 12 split pane (300px | 1fr, dual 100vh). Markup is a
+   card grid + modal; commenting this block should not be required for
+   correctness, but PHASE 12 rules that fight the new layout are overridden here.
+   ===== */
+.assign-task .assign-head .yr-count {
+  margin-left: auto;
+}
+
+.assign-task .assign-body {
+  display: block;
+  grid-template-columns: none;
+  gap: 0;
+  min-height: 0;
+  height: auto;
+}
+
+.assign-task .task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.assign-task .at-task-search {
+  display: block;
+  max-width: 420px;
+}
+
+.assign-task .task-list-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.assign-task .at-task-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.assign-task .at-task-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--dash-card-border, var(--border));
+}
+
+.assign-task .at-task-section-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--dash-text-quiet, var(--text-soft));
+}
+
+.assign-task .at-task-section-head .yr-status {
+  min-width: 1.5rem;
+  justify-content: center;
+  padding: 2px 8px;
+  font-size: 0.6875rem;
+}
+
+.assign-task .task-list-scroll {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  flex: none;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+.assign-task .task-card {
+  min-width: 0;
+  height: 100%;
+  cursor: pointer;
+}
+
+.assign-task .task-card-foot {
+  flex-wrap: wrap;
+}
+
+.assign-task .task-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--dash-card-border, var(--border));
+}
+
+.assign-task .modal-card.pipeline-modal {
+  width: min(1200px, 96vw);
+  max-width: 96vw;
+  max-height: 92vh;
+}
+
+.assign-task .pipeline-modal .modal-head {
+  flex-wrap: wrap;
+  gap: 10px 12px;
+}
+
+.assign-task .pipeline-modal .inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.assign-task .pipeline-modal .modal-close {
+  flex: 0 0 auto;
+}
+
+.assign-task .pipeline-modal .modal-body {
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.assign-task .pipeline-modal .modal-overlay {
+  z-index: 120;
+}
+
+.assign-task .pipeline-modal .task-detail {
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.assign-task .pipeline-modal .task-detail-body {
+  flex: none;
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+
+.assign-task .pipeline-modal .task-detail-body .pipeline-board {
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .assign-task .assign-body {
+    grid-template-columns: none;
+    min-height: 0;
+  }
+
+  .assign-task .task-list,
+  .assign-task .task-detail {
+    height: auto;
+    max-height: none;
+  }
+
+  .assign-task .task-list {
+    max-height: none;
+  }
+
+  .assign-task .pipeline-modal .inline-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+/* ===== PHASE 18: Assign Task card grid + pipeline modal END ===== */
+

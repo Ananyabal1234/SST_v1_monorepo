@@ -2,9 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { get, patch } from '../../services/apiClient';
 import { ENDPOINTS } from '../../config/api';
 import {
-  IconUsers, IconUserCheck, IconClock, IconCheckCircle, IconXCircle, IconBriefcase, IconEdit, IconFilePlus,
+  IconUsers, IconUserCheck, IconClock, IconCheckCircle, IconXCircle, IconBriefcase, IconEdit, IconFilePlus, IconFilter, IconX,
 } from '../../components/Icons';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { formatDate, toDateInput } from '../../utils/formatDate';
+import { matchesQuery, useDebouncedValue } from '../../utils/listSearch';
+import TableSearch from '../../components/TableSearch';
+import { EmptyState, ScreenSkeleton } from '../../components/ui';
+import { useToast } from '../../context/ToastContext';
 
 const STATUS_META = {
   JOINED: { icon: IconCheckCircle, cls: 'st-joined' },
@@ -26,11 +31,6 @@ const FALLBACK_OFFER_STATUSES = [
   { code: 'HOLD', label: 'Hold' },
   { code: 'BACKOUT', label: 'Backout' },
 ];
-
-function toDateInput(value) {
-  if (!value) return '';
-  return String(value).slice(0, 10);
-}
 
 function normalizeList(res) {
   if (Array.isArray(res)) return res;
@@ -69,8 +69,8 @@ function onboardingRow(o, offerStatusOptions = FALLBACK_OFFER_STATUSES) {
     ctcRate: o.ctcRate || o.offer?.ctcRate || '—',
     hrOwnerId: o.hrOwnerId || o.hrOwner?.id || '',
     hrOwnerName: o.hrOwnerName || o.hrOwner?.fullName || '—',
-    expectedDoj: toDateInput(o.expectedDOJ || o.expectedDoj) || '—',
-    actualDoj: toDateInput(o.actualDOJ || o.actualDoj) || '—',
+    expectedDoj: formatDate(o.expectedDOJ || o.expectedDoj),
+    actualDoj: formatDate(o.actualDOJ || o.actualDoj),
     pendingDocs: o.pendingDocs ?? o.docsPending,
     bgvStatus: o.bgvStatus || o.bgvStatusCode || '—',
     onboardingStatus: o.onboardingStatus || o.statusCode || '—',
@@ -80,6 +80,7 @@ function onboardingRow(o, offerStatusOptions = FALLBACK_OFFER_STATUSES) {
 }
 
 export default function HrCandidatesScreen() {
+  const { toast } = useToast();
   const [rows, setRows] = useState([]);
   const [offerStatusOptions, setOfferStatusOptions] = useState(FALLBACK_OFFER_STATUSES);
   const [loading, setLoading] = useState(true);
@@ -102,6 +103,8 @@ export default function HrCandidatesScreen() {
   const [loadingRow, setLoadingRow] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [listSearch, setListSearch] = useState('');
+  const listSearchQ = useDebouncedValue(listSearch);
 
   useEscapeKey(modalOpen, () => { if (!saving) setModalOpen(false); });
 
@@ -222,11 +225,12 @@ export default function HrCandidatesScreen() {
       const res = await patch(`${ENDPOINTS.ONBOARDINGS}/${editingId}`, payload);
       const offerLeftAccepted =
         String(form.offerStatus || '').toUpperCase() !== 'ACCEPTED';
-      setSuccess(
+      const okMsg =
         offerLeftAccepted
           ? (res?.message || 'Offer updated — candidate returned to Offers')
-          : (res?.message || 'Onboarding updated successfully'),
-      );
+          : (res?.message || 'Onboarding updated successfully');
+      setSuccess(okMsg);
+      toast(okMsg);
       setModalOpen(false);
       await loadOnboardings();
     } catch (err) {
@@ -240,39 +244,110 @@ export default function HrCandidatesScreen() {
     }
   };
 
-  if (loading) return <div className="screen-loading"><div className="spinner" /></div>;
+  if (loading) return <ScreenSkeleton rows={8} />;
+
+  const displayed = visible.filter((item) => {
+    const row = onboardingRow(item, offerStatusOptions);
+    return matchesQuery(
+      listSearchQ,
+      row.publicId,
+      row.offerPublicId,
+      row.candidatePublicId,
+      row.candidateName,
+      row.email,
+      row.mobile,
+      row.clientRole,
+      row.reqId,
+    );
+  });
+  const hasFilters = Boolean(filter !== 'All' || listSearch.trim());
+  const clearFilters = () => {
+    setFilter('All');
+    setListSearch('');
+  };
 
   return (
-    <div className="hr-candidates">
+    <div className="hr-candidates hr-onboarding">
       <div className="assign-head">
         <span className="assign-badge"><IconUsers /></span>
         <div>
           <h2 className="assign-title">Onboarding</h2>
           <p className="assign-sub">Track and update candidate onboarding.</p>
         </div>
+        {rows.length > 0 && <span className="yr-count">{displayed.length} shown</span>}
       </div>
 
-      <div className="hr-chips">
-        {['All', ...statuses].map((s) => {
-          const Meta = STATUS_META[s];
-          const Icon = Meta ? Meta.icon : IconUsers;
-          return (
-            <button
-              key={s}
-              className={`hr-chip ${filter === s ? 'active' : ''} ${Meta ? Meta.cls : 'st-all'}`}
-              onClick={() => setFilter(s)}
-            >
-              <Icon />
-              <span>{s}</span>
-              <em>{counts[s] || 0}</em>
-            </button>
-          );
-        })}
-      </div>
+      {rows.length > 0 && (
+        <div className="filter-bar">
+          <div className="filter-bar-head">
+            <IconFilter />
+            <span>Filters</span>
+            {hasFilters && (
+              <span className="filter-count">
+                {(filter !== 'All' ? 1 : 0) + (listSearch.trim() ? 1 : 0)} active
+              </span>
+            )}
+            {hasFilters && (
+              <button type="button" className="filter-clear" onClick={clearFilters}>Clear</button>
+            )}
+          </div>
+          {hasFilters && (
+            <div className="filter-chips" aria-label="Active filters">
+              {filter !== 'All' && (
+                <button type="button" className="filter-chip" onClick={() => setFilter('All')}>
+                  Status: {filter}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+              {listSearch.trim() && (
+                <button type="button" className="filter-chip" onClick={() => setListSearch('')}>
+                  Search: {listSearch.trim()}
+                  <IconX width={12} height={12} />
+                </button>
+              )}
+            </div>
+          )}
+          <div className="hr-chips">
+            {['All', ...statuses].map((s) => {
+              const Meta = STATUS_META[s];
+              const Icon = Meta ? Meta.icon : IconUsers;
+              return (
+                <button
+                  key={s}
+                  className={`hr-chip ${filter === s ? 'active' : ''} ${Meta ? Meta.cls : 'st-all'}`}
+                  onClick={() => setFilter(s)}
+                >
+                  <Icon />
+                  <span>{s}</span>
+                  <em>{counts[s] || 0}</em>
+                </button>
+              );
+            })}
+          </div>
+          <TableSearch
+            value={listSearch}
+            onChange={setListSearch}
+            placeholder="Search onboarding, candidates, IDs…"
+          />
+        </div>
+      )}
 
       {error && !modalOpen && <div className="add-error">{error}</div>}
       {success && <div className="add-success">{success}</div>}
 
+      {rows.length === 0 ? (
+        <EmptyState
+          icon={IconUsers}
+          title="No onboarding records"
+          description="Accepted offers appear here for joining and BGV tracking."
+        />
+      ) : displayed.length === 0 ? (
+        <EmptyState
+          icon={IconUsers}
+          title="No matching records"
+          description="Try a different search or status chip."
+        />
+      ) : (
       <div className="cand-table-wrap">
         <table className="cand-table hr-table">
           <thead>
@@ -298,10 +373,7 @@ export default function HrCandidatesScreen() {
             </tr>
           </thead>
           <tbody>
-            {visible.length === 0 && (
-              <tr><td colSpan={18} className="cand-empty">No onboarding records yet.</td></tr>
-            )}
-            {visible.map((item) => {
+            {displayed.map((item) => {
               const row = onboardingRow(item, offerStatusOptions);
               const Meta = STATUS_META[row.onboardingStatus] || STATUS_META.DOCS_PENDING;
               return (
@@ -314,23 +386,35 @@ export default function HrCandidatesScreen() {
                   <td>{row.reqId}</td>
                   <td>{row.email}</td>
                   <td>{row.mobile}</td>
-                  <td>{row.offerStatusLabel}</td>
+                  <td>
+                    <span className={`hr-pill hr-pill-status ${(row.offerStatus || '').toLowerCase()}`}>
+                      {row.offerStatusLabel}
+                    </span>
+                  </td>
                   <td>{row.ctcRate}</td>
                   <td>{row.hrOwnerName}</td>
                   <td>{row.expectedDoj}</td>
                   <td>{row.actualDoj}</td>
                   <td>{row.pendingDocs ? 'Yes' : 'No'}</td>
-                  <td>{row.bgvStatus}</td>
+                  <td>
+                    <span className={`hr-pill hr-pill-bgv ${(row.bgvStatus || '').toLowerCase()}`}>
+                      {row.bgvStatus}
+                    </span>
+                  </td>
                   <td>
                     <span className={`hr-status-label ${Meta.cls}`}>
                       {row.onboardingStatus}
                     </span>
                   </td>
-                  <td>{row.requirementStatus}</td>
                   <td>
-                    <button className="hr-detail-btn" onClick={() => openUpdate(item)}>
+                    <span className={`hr-pill hr-pill-req ${(row.requirementStatus || '').toLowerCase()}`}>
+                      {row.requirementStatus}
+                    </span>
+                  </td>
+                  <td>
+                    <button className="hr-detail-btn" onClick={() => openUpdate(item)} title="Update details">
                       <IconEdit />
-                      <span>Update Details</span>
+                      <span>Update</span>
                     </button>
                   </td>
                 </tr>
@@ -339,6 +423,7 @@ export default function HrCandidatesScreen() {
           </tbody>
         </table>
       </div>
+      )}
 
       {modalOpen && (
         <div className="modal-overlay" onClick={() => !saving && setModalOpen(false)}>

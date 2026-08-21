@@ -8,6 +8,7 @@ import {
   groupByPipelineStage,
 } from '../utils/pipelineStage';
 import { IconClipboardCheck, IconPlus } from './Icons';
+import RequirementNotes from './RequirementNotes';
 
 /**
  * Shared requirement candidate pipeline board.
@@ -22,6 +23,7 @@ export default function RequirementPipelineBoard({
   onEditCandidate,
   onSelectCandidate,
   onViewCandidate,
+  onAdvanceStage,
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -105,24 +107,47 @@ export default function RequirementPipelineBoard({
           </div>
         )}
 
-        <div className="pipeline-count-chips">
-          {PIPELINE_COLUMNS.map((col) => {
-            const count = grouped[col.key]?.length || 0;
-            if (!count && (col.key === 'HOLD' || col.key === 'REJECT')) return null;
-            return (
-              <span key={col.key} className="pipeline-chip">
-                {col.label} <strong>{count}</strong>
-              </span>
-            );
-          })}
-          <span className="pipeline-chip pipeline-chip--total">
-            Total <strong>{summary?.totalCandidates ?? candidates.length}</strong>
-          </span>
-        </div>
+        {!loading && (
+          <div className="pipeline-count-chips">
+            {PIPELINE_COLUMNS.map((col) => {
+              const count = grouped[col.key]?.length || 0;
+              if (!count && (col.key === 'HOLD' || col.key === 'REJECT')) return null;
+              return (
+                <span key={col.key} className="pipeline-chip">
+                  {col.label} <strong>{count}</strong>
+                </span>
+              );
+            })}
+            <span className="pipeline-chip pipeline-chip--total">
+              Total <strong>{summary?.totalCandidates ?? candidates.length}</strong>
+            </span>
+          </div>
+        )}
       </div>
 
       {error && <div className="add-error">{Array.isArray(error) ? error.join(', ') : error}</div>}
-      {loading && <div className="pipeline-loading">Loading pipeline…</div>}
+
+      {loading && (
+        <div className="pipeline-columns" aria-busy="true" aria-label="Loading pipeline">
+          {PIPELINE_COLUMNS.map((col) => (
+            <div key={col.key} className={`pipeline-column pipeline-column--${col.key.toLowerCase()}`}>
+              <div className="pipeline-column-head">
+                <span>{col.label}</span>
+                <span className="pipeline-column-count">—</span>
+              </div>
+              <div className="pipeline-column-body">
+                <div className="pipeline-skel" />
+                <div className="pipeline-skel" />
+                <div className="pipeline-skel pipeline-skel--short" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!loading && !error && candidates.length === 0 && (
+        <div className="pipeline-board-empty">No candidates in this pipeline yet.</div>
+      )}
 
       {!loading && !error && (
         <div className="pipeline-columns">
@@ -136,10 +161,11 @@ export default function RequirementPipelineBoard({
                 </div>
                 <div className="pipeline-column-body">
                   {items.length === 0 && (
-                    <div className="pipeline-empty">No candidates</div>
+                    <div className="pipeline-empty">No candidates in this stage</div>
                   )}
                   {items.map((c) => {
-                    const { pipelineLabel } = derivePipelineStage(c);
+                    const { pipelineStage, pipelineLabel } = derivePipelineStage(c);
+                    const terminal = pipelineStage === 'JOINED' || pipelineStage === 'ONBOARDING' || pipelineStage === 'OFFER' || pipelineStage === 'SELECTED';
                     return (
                       <div
                         key={c.id || c.publicId}
@@ -173,6 +199,30 @@ export default function RequirementPipelineBoard({
                                 Select
                               </button>
                             )}
+                            {onAdvanceStage && !recruitingBlocked && !terminal && (
+                              <>
+                                {pipelineStage !== 'CLIENT_SHORTLIST' && pipelineStage !== 'INTERVIEW' && (
+                                  <button type="button" className="cand-edit" onClick={() => onAdvanceStage(c, 'shortlist')}>
+                                    Shortlist
+                                  </button>
+                                )}
+                                {pipelineStage !== 'INTERVIEW' && pipelineStage !== 'HOLD' && pipelineStage !== 'REJECT' && (
+                                  <button type="button" className="cand-edit" onClick={() => onAdvanceStage(c, 'interview')}>
+                                    Interview
+                                  </button>
+                                )}
+                                {pipelineStage !== 'HOLD' && (
+                                  <button type="button" className="cand-edit" onClick={() => onAdvanceStage(c, 'hold')}>
+                                    Hold
+                                  </button>
+                                )}
+                                {pipelineStage !== 'REJECT' && (
+                                  <button type="button" className="cand-edit" onClick={() => onAdvanceStage(c, 'reject')}>
+                                    Reject
+                                  </button>
+                                )}
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -184,6 +234,8 @@ export default function RequirementPipelineBoard({
           })}
         </div>
       )}
+
+      {requirementId && <RequirementNotes requirementId={requirementId} />}
     </div>
   );
 }

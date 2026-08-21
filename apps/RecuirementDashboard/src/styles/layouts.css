@@ -311,7 +311,8 @@
 .add-request { max-width: var(--content-narrow); }
 .assign-task,
 .hr-candidates,
-.yr-screen { max-width: var(--content-wide); }
+.yr-screen,
+.users-screen { max-width: var(--content-wide); }
 
 .screen-title {
   font-size: var(--text-section);
