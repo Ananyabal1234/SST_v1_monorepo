@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Date | 2026-08-03T07:21:55.269Z |
+| Date | 2026-08-21T06:04:51.240Z |
 | API | http://localhost:3000 |
 | Pass | 53 |
 | Fail | 0 |
@@ -24,7 +24,7 @@
 | TC-MD-005 | Pass |  |
 | TC-MD-006 | Pass |  |
 | TC-MD-007 | Pass |  |
-| TC-DATA-002 | Pass | client=3b57137f-f845-4a70-85d3-6695c7c91eaa jf=8248ea45-a881-4668-9dbc-13d776359716 |
+| TC-DATA-002 | Pass | client=17213862-5df4-4ca1-b60b-6fe6ee768f37 jf=dc5ea946-3cbd-4e9a-9241-b67c214c1d59 |
 | TC-SMK-login-SALES | Pass |  |
 | TC-SMK-login-SALES_LEAD | Pass |  |
 | TC-SMK-login-TA | Pass |  |
@@ -44,18 +44,18 @@
 | TC-AZ-004 | Pass |  |
 | TC-AZ-022 | Pass |  |
 | TC-DSH-009 | Pass |  |
-| TC-J1-001 | Pass | id=af674d14-2fd2-426d-8030-f49826ef8639 open=2 closed=0 status=ACTIVE |
+| TC-J1-001 | Pass | id=c78d4995-997e-4279-8988-809265807221 open=2 closed=0 status=ACTIVE |
 | TC-J1-014 | Pass | open=2 closed=0 |
 | TC-TAL-002 | Pass |  |
 | TC-J1-012 | Pass |  |
 | TC-TAL-003 | Pass | status=403 |
-| TC-J2-001 | Pass | cand=0f0bae82-4056-4e39-bf33-7a420fbeac5d |
+| TC-J2-001 | Pass | cand=45f30fb7-1961-45f8-ab77-748b391c7db0 |
 | TC-J2-003 | Pass | status=200 |
 | TC-J2-005 | Pass |  |
-| TC-J3-001 | Pass | offer=ff93bc23-cdb1-40ef-8e94-87afad5bfd64 |
+| TC-J3-001 | Pass | offer=de427a33-0287-4065-b156-f8c93dec429f |
 | TC-J3-003 | Pass |  |
 | TC-J3-004 | Pass |  |
-| TC-J3-005 | Pass | onb=e95e273a-ef68-4d8f-bcd4-47c05d28d99b status=409 |
+| TC-J3-005 | Pass | onb=34e0cfe5-6b7f-4fea-88d6-36eec9a0a272 status=409 |
 | TC-J3-006 | Pass |  |
 | TC-J3-008 | Pass |  |
 | TC-J3-010 | Pass | open=1 closed=1 status=ACTIVE |

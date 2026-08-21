@@ -14,7 +14,8 @@ async function signIn(page: import('@playwright/test').Page, email: string, pass
 test.describe('Smoke / role landing (P1)', () => {
   test('TC-SMK-002: login page renders', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.getByRole('heading', { name: 'Talent Analytics' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByText('Talent Analytics')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
   });
 
